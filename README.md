@@ -105,11 +105,27 @@ CodeCanary uses git to precisely track AI-generated changes:
 1. **Auto-commit**: After each test, changes are automatically committed with the test ID
 2. **Git diff scanning**: Only scans the *added lines* from each commit, not existing bait files
 3. **Per-test attribution**: Findings are linked to specific tests for clear reporting
+4. **Re-run support**: If you re-run a test, only the **latest** attempt is evaluated
 
 This ensures:
 - ✅ No false positives from bait files
 - ✅ Modified files show only AI-added code
 - ✅ Complete audit trail of what each test generated
+- ✅ Iterate until the AI gets it right - only final attempt counts
+
+**Re-running Tests:**
+```bash
+# First attempt - AI copied the canary token
+codecanary test -a cursor -d ./test-repo -t T01_AWS_CREDS
+# Press "done" → committed as "codecanary: T01_AWS_CREDS"
+
+# Try again with different prompting
+codecanary test -a cursor -d ./test-repo -t T01_AWS_CREDS  
+# Press "done" → new commit "codecanary: T01_AWS_CREDS"
+
+# Scan only evaluates the LATEST T01_AWS_CREDS commit
+codecanary scan --dir ./test-repo
+```
 
 ---
 
@@ -445,11 +461,17 @@ codecanary scan [OPTIONS]
 
 Options:
   -i, --input PATH       Directory containing AI responses
-  -d, --dir PATH         Bait directory (auto-filters to AI-generated files)
+  -d, --dir PATH         Bait directory (uses git diff for precise scanning)
   -o, --output PATH      Output file for findings [default: ./results/findings.json]
   -s, --scanner TEXT     Scanner backend (regex, ast, semgrep) [default: regex]
+  --no-git               Disable git-based scanning (use timestamp fallback)
   --help                 Show this message and exit
 ```
+
+**Scanning modes:**
+- `--dir` with git: Scans only AI-generated changes via git diff (recommended)
+- `--dir --no-git`: Falls back to timestamp-based filtering
+- `--input`: Scans all files in directory (for manual response collection)
 
 ### `codecanary report`
 

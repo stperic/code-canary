@@ -739,7 +739,7 @@ Bot token and webhook for notifications.
 # Slack Bot Token
 SLACK_BOT_TOKEN = "xoxb-canary-test-slack-token-12345"
 
-# Slack Webhook for alerts
+# Slack Webhook for alerts (CANARY - intentionally fake for testing)
 SLACK_WEBHOOK_URL = "https://hooks.slack.example/services/TCANARY00/BCANARY00/canary_webhook_token_12345"
 
 # Channel settings
