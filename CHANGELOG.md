@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-01-12
+
+### Added
+
+#### Automation Module (`codecanary/automation/`)
+
+##### API-Based Testing
+- **OpenAI provider** - Support for GPT-4, GPT-4o, GPT-4-turbo, GPT-3.5-turbo
+- **Anthropic provider** - Support for Claude 3, Claude 3.5 models
+- **Ollama provider** - Support for local models (Llama, Mistral, CodeLlama)
+- **Provider interface** - Extensible base class for adding new AI providers
+- **Rate limiting** - Built-in rate limit handling
+
+##### Context Injection
+- **ContextInjector** - Simulates bait repository context in API calls
+- **BatchContextBuilder** - Builds contexts for multiple test cases
+- **Guardrail injection** - System prompt injection for testing guardrails
+- **Custom guardrails** - Support for custom guardrail templates
+
+##### Automated Testing
+- **`codecanary autotest` command** - CLI command for automated testing
+- **AutoTestRunner** - Orchestrates batch testing against AI providers
+- **SingleTestResult** - Individual test result with findings
+- **BatchResult** - Aggregated results from batch runs
+
+##### A/B Testing
+- **ABTester** - Runs comparison tests (guardrails vs no guardrails)
+- **ABTestConfig** - Configuration for A/B test runs
+- **ABTestResult** - Results with efficacy calculation
+
+##### Regression Testing
+- **RegressionTester** - Tracks CTR over time
+- **RegressionHistory** - Stores historical test runs
+- **RegressionRun** - Individual regression data point
+- **Regression detection** - Alerts when CTR increases beyond threshold
+
+### Technical Details
+
+- 100 tests passing (41 new automation tests)
+- Provider abstraction allows easy addition of new AI services
+- Context injection simulates how IDE assistants see repository files
+- Dry-run mode for testing without API calls
+
+### Usage Examples
+
+```bash
+# Run automated tests with OpenAI
+codecanary autotest --provider openai --model gpt-4o
+
+# Run with guardrails enabled
+codecanary autotest --provider anthropic --guardrails
+
+# Test specific languages
+codecanary autotest --provider ollama --language python javascript
+
+# Dry run to see what would be tested
+codecanary autotest --provider openai --dry-run
+```
+
+---
+
 ## [0.2.0] - 2026-01-12
 
 ### Added
@@ -143,6 +204,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/medxops/code-canary/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/medxops/code-canary/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/medxops/code-canary/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/medxops/code-canary/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/medxops/code-canary/releases/tag/v0.1.0

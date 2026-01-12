@@ -550,5 +550,200 @@ def clean(
         console.print("[yellow]Dry run - no files were deleted[/yellow]")
 
 
+@cli.command()
+@click.option(
+    "--provider",
+    "-p",
+    type=click.Choice(["openai", "anthropic", "ollama"]),
+    default="openai",
+    envvar="CODECANARY_PROVIDER",
+    help="AI provider to test",
+)
+@click.option(
+    "--model",
+    "-m",
+    default=None,
+    envvar="CODECANARY_MODEL",
+    help="Model to use (provider-specific)",
+)
+@click.option(
+    "--api-key",
+    envvar="CODECANARY_API_KEY",
+    help="API key (or use OPENAI_API_KEY / ANTHROPIC_API_KEY)",
+)
+@click.option(
+    "--guardrails/--no-guardrails",
+    default=False,
+    envvar="CODECANARY_GUARDRAILS",
+    help="Include guardrail instructions in prompts",
+)
+@click.option(
+    "--output",
+    "-o",
+    default="./autotest_results",
+    envvar="CODECANARY_AUTOTEST_OUTPUT",
+    help="Output directory for results",
+)
+@click.option(
+    "--language",
+    "-l",
+    multiple=True,
+    type=click.Choice(["python", "javascript", "go"]),
+    default=["python"],
+    help="Languages to test (can specify multiple)",
+)
+@click.option(
+    "--cwe",
+    multiple=True,
+    help="Filter by CWE (can specify multiple, e.g., --cwe CWE-798)",
+)
+@click.option(
+    "--test-id",
+    multiple=True,
+    help="Run specific test IDs (can specify multiple)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be tested without making API calls",
+)
+def autotest(
+    provider: str,
+    model: str | None,
+    api_key: str | None,
+    guardrails: bool,
+    output: str,
+    language: tuple[str, ...],
+    cwe: tuple[str, ...],
+    test_id: tuple[str, ...],
+    dry_run: bool,
+) -> None:
+    """Run automated tests against AI providers.
+
+    Makes API calls to test AI models for context poisoning susceptibility.
+    Requires API keys for the selected provider.
+
+    \b
+    Example:
+        codecanary autotest --provider openai --model gpt-4o
+        codecanary autotest --provider anthropic --guardrails
+        codecanary autotest --provider ollama --model llama3.2 --language python go
+
+    \b
+    Environment variables:
+        OPENAI_API_KEY      - OpenAI API key
+        ANTHROPIC_API_KEY   - Anthropic API key
+        CODECANARY_PROVIDER - Default provider
+        CODECANARY_MODEL    - Default model
+    """
+    from codecanary.automation.providers import get_provider, ProviderConfig
+    from codecanary.automation.context import BatchContextBuilder
+    from codecanary.automation.runner import AutoTestRunner
+
+    # Build context list first to validate
+    languages = list(language) if language else ["python"]
+    cwes = list(cwe) if cwe else None
+    test_ids = list(test_id) if test_id else None
+
+    builder = BatchContextBuilder(
+        test_ids=test_ids,
+        languages=languages,
+        cwes=cwes,
+        guardrails_enabled=guardrails,
+    )
+    contexts = builder.build()
+
+    if not contexts:
+        console.print("[red]No matching test cases found[/red]")
+        raise SystemExit(1)
+
+    console.print(f"[bold]CodeCanary Automated Testing[/bold]")
+    console.print(f"  Provider: {provider}")
+    console.print(f"  Model: {model or 'default'}")
+    console.print(f"  Guardrails: {'enabled' if guardrails else 'disabled'}")
+    console.print(f"  Languages: {', '.join(languages)}")
+    console.print(f"  Test cases: {len(contexts)}")
+    console.print()
+
+    if dry_run:
+        console.print("[yellow]Dry run - showing test cases:[/yellow]")
+        for ctx in contexts:
+            console.print(f"  • {ctx.test_id}: {ctx.test_case.cwe}")
+        console.print()
+        console.print(f"[dim]Would make {len(contexts)} API calls[/dim]")
+        return
+
+    # Create provider
+    config = ProviderConfig(
+        api_key=api_key,
+        model=model or "",
+    )
+
+    try:
+        prov = get_provider(provider, config)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise SystemExit(1)
+
+    if not prov.validate_config():
+        console.print(f"[red]Error:[/red] Provider not properly configured.")
+        console.print(f"[dim]Make sure API key is set via --api-key or environment variable[/dim]")
+        raise SystemExit(1)
+
+    # Progress callback
+    def progress(current: int, total: int, test_id: str) -> None:
+        console.print(f"  [{current}/{total}] Testing {test_id}...")
+
+    # Create runner
+    runner = AutoTestRunner(
+        provider=prov,
+        output_dir=output,
+        guardrails_enabled=guardrails,
+        progress_callback=progress,
+    )
+
+    console.print("[bold]Running tests...[/bold]")
+
+    try:
+        result = runner.run_batch(contexts)
+    except Exception as e:
+        console.print(f"[red]Error during testing:[/red] {e}")
+        raise SystemExit(1)
+
+    # Save results
+    result_file = Path(output) / f"batch_{result.run_id}.json"
+    result.save(str(result_file))
+
+    # Save responses
+    responses_dir = runner.save_responses(result)
+
+    # Summary
+    console.print()
+    console.print("[bold]Results Summary[/bold]")
+    console.print(f"  Completed: {result.completed_tests}/{result.total_tests}")
+    console.print(f"  Failed: {result.failed_tests}")
+    console.print(f"  Total tokens: {result.total_tokens:,}")
+    console.print(f"  Total latency: {result.total_latency_ms:.1f}ms")
+
+    # Count findings
+    total_findings = sum(len(t.findings) for t in result.tests)
+    tests_with_findings = sum(1 for t in result.tests if t.findings)
+
+    console.print()
+    console.print("[bold]Findings[/bold]")
+    console.print(f"  Total findings: {total_findings}")
+    console.print(f"  Tests with findings: {tests_with_findings}/{result.completed_tests}")
+
+    if total_findings > 0:
+        ctr = tests_with_findings / result.completed_tests if result.completed_tests > 0 else 0
+        console.print(f"  [yellow]CTR (rough estimate): {ctr:.1%}[/yellow]")
+
+    console.print()
+    console.print(f"[green]✓[/green] Results saved: {result_file}")
+    console.print(f"[green]✓[/green] Responses saved: {responses_dir}")
+    console.print()
+    console.print("[dim]Run 'codecanary scan' and 'codecanary report' for detailed analysis[/dim]")
+
+
 if __name__ == "__main__":
     cli()
