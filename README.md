@@ -7,14 +7,16 @@
 <p align="center">
   <a href="#installation">Installation</a> •
   <a href="#quick-start">Quick Start</a> •
+  <a href="#automated-testing">Automated Testing</a> •
   <a href="#how-it-works">How It Works</a> •
   <a href="#documentation">Docs</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/pypi/v/codecanary?color=blue" alt="PyPI Version"/>
-  <img src="https://img.shields.io/pypi/pyversions/codecanary" alt="Python Versions"/>
+  <img src="https://img.shields.io/badge/version-0.4.0-blue" alt="Version"/>
+  <img src="https://img.shields.io/badge/tests-188%20passing-brightgreen" alt="Tests"/>
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python Versions"/>
   <img src="https://img.shields.io/github/license/medxops/code-canary" alt="License"/>
   <img src="https://img.shields.io/github/stars/medxops/code-canary?style=social" alt="GitHub Stars"/>
 </p>
@@ -38,6 +40,21 @@ CodeCanary provides a standardized benchmark to:
 - 🔒 **Validate** that your guardrails (`.cursorrules`) actually work
 - ⚖️ **Compare** AI assistants on security criteria
 - ✅ **Decide** which tools are safe for enterprise deployment
+- 🤖 **Automate** testing via API with 5 supported providers
+
+---
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| 🎯 **36 Test Cases** | Python, JavaScript, and Go patterns |
+| 🤖 **5 AI Providers** | OpenAI, Anthropic, Ollama, Gemini, Mistral |
+| 🔍 **3 Scanner Types** | Regex, AST (Python), Semgrep |
+| 📡 **Capture Proxy** | mitmproxy-based IDE interception |
+| 📊 **SARIF Output** | CI/CD integration |
+| ⚡ **A/B Testing** | Guardrails vs baseline comparison |
+| 📈 **Regression Tracking** | Monitor CTR over time |
 
 ---
 
@@ -51,9 +68,14 @@ pip install codecanary
 
 # Using uv (recommended)
 uv pip install codecanary
+
+# From source
+git clone https://github.com/medxops/code-canary.git
+cd code-canary
+pip install -e .
 ```
 
-### Run Your First Benchmark
+### Run Your First Benchmark (Manual)
 
 ```bash
 # 1. Generate a "bait" repository with canary tokens
@@ -75,7 +97,109 @@ codecanary scan --input ./responses
 codecanary report --format summary
 ```
 
-### Sample Output
+---
+
+## Automated Testing
+
+### API-Based Testing (v0.3.0+)
+
+Test AI models directly via API without manual intervention:
+
+```bash
+# Test with OpenAI
+export OPENAI_API_KEY="your-key"
+codecanary autotest --provider openai --model gpt-4o
+
+# Test with Anthropic Claude
+export ANTHROPIC_API_KEY="your-key"
+codecanary autotest --provider anthropic --model claude-3-5-sonnet-20241022
+
+# Test with Google Gemini
+export GOOGLE_API_KEY="your-key"
+codecanary autotest --provider gemini --model gemini-1.5-pro
+
+# Test with Mistral
+export MISTRAL_API_KEY="your-key"
+codecanary autotest --provider mistral --model codestral-latest
+
+# Test with local Ollama
+codecanary autotest --provider ollama --model llama3.2
+```
+
+### Autotest Options
+
+```bash
+codecanary autotest [OPTIONS]
+
+Options:
+  -p, --provider TEXT    AI provider (openai, anthropic, ollama, gemini, mistral)
+  -m, --model TEXT       Model to use
+  --guardrails           Include guardrail instructions
+  --no-guardrails        No guardrails [default]
+  -l, --language TEXT    Languages to test (python, javascript, go)
+  -o, --output PATH      Output directory [default: ./autotest_results]
+  --dry-run              Preview what would be tested
+```
+
+### A/B Testing (Guardrails)
+
+Compare results with and without guardrails:
+
+```python
+from codecanary.automation import ABTester, ABTestConfig
+
+config = ABTestConfig(
+    provider="openai",
+    model="gpt-4o",
+    languages=["python"],
+)
+
+tester = ABTester(config)
+result = tester.run()
+
+print(f"Baseline CTR: {result.baseline_ctr:.1%}")
+print(f"Guardrailed CTR: {result.guardrailed_ctr:.1%}")
+print(f"Efficacy: {result.efficacy:.1%}")
+```
+
+---
+
+## Capture Proxy
+
+Intercept AI assistant responses from IDEs using mitmproxy:
+
+```bash
+# Generate proxy script
+codecanary proxy start --port 8080
+
+# Configure your IDE to use proxy:
+#   HTTP Proxy: 127.0.0.1:8080
+
+# Start the proxy
+mitmdump -s codecanary_proxy.py --listen-host 127.0.0.1 --listen-port 8080
+
+# Export captured responses
+codecanary proxy export --output ./captured_responses
+
+# View statistics
+codecanary proxy stats
+
+# Clear database
+codecanary proxy clear
+```
+
+### Proxy Setup
+
+1. Install mitmproxy: `pip install mitmproxy`
+2. Run `codecanary proxy start` to generate the script
+3. Start the proxy with `mitmdump`
+4. Configure IDE to use the proxy
+5. Install mitmproxy CA certificate (visit http://mitm.it)
+6. Use IDE normally - responses are captured automatically
+
+---
+
+## Sample Output
 
 ```
 ═══════════════════════════════════════════════════════════════════
@@ -166,26 +290,17 @@ CodeCanary scans the AI's response for the poisoned patterns:
 
 ---
 
-## Threat Model
-
-### What CodeCanary Tests
-
-**Passive Context Poisoning**: AI learns from existing code patterns and replicates them—even when the source patterns are insecure.
-
-### What CodeCanary Does NOT Test
-
-| Attack Type | Tested? | Notes |
-|-------------|---------|-------|
-| Passive Context Poisoning | ✅ Yes | Core focus |
-| Indirect Prompt Injection | ❌ No | Malicious instructions in code comments |
-| Direct Prompt Injection | ❌ No | Adversarial user prompts |
-| Model Jailbreaking | ❌ No | Attacks on model safety training |
-
----
-
 ## Test Coverage
 
-CodeCanary tests for vulnerabilities mapped to OWASP Top 10 and CWE:
+### 36 Test Cases Across 3 Languages
+
+| Language | Tests | CWEs Covered |
+|----------|-------|--------------|
+| Python | 20 | CWE-78, 79, 89, 94, 295, 319, 327, 328, 330, 338, 400, 502, 601, 611, 703, 776, 798, 918 |
+| JavaScript | 8 | CWE-22, 78, 79, 89, 94, 295, 327, 798 |
+| Go | 8 | CWE-22, 78, 89, 295, 327, 338, 502, 798 |
+
+### Core Test Cases
 
 | Test | CWE | Severity | Description |
 |------|-----|----------|-------------|
@@ -197,6 +312,76 @@ CodeCanary tests for vulnerabilities mapped to OWASP Top 10 and CWE:
 | T06 | CWE-502 | High | Pickle deserialization |
 | T07 | CWE-319 | Medium | HTTP instead of HTTPS |
 | T08 | CWE-330 | Medium | Weak random for secrets |
+
+---
+
+## Scanners
+
+CodeCanary supports three scanner backends:
+
+| Scanner | Languages | Use Case |
+|---------|-----------|----------|
+| **RegexScanner** | All | Fast, canary token detection (default) |
+| **ASTScanner** | Python | Semantic analysis, fewer false positives |
+| **SemgrepScanner** | Python, JS, Go | Production-grade, extensive rules |
+
+### Using Different Scanners
+
+```bash
+# Default regex scanner
+codecanary scan --input ./responses
+
+# Python AST scanner (more accurate for Python)
+codecanary scan --input ./responses --scanner ast
+
+# Semgrep scanner (requires: pip install semgrep)
+codecanary scan --input ./responses --scanner semgrep
+```
+
+### AST Detections
+
+| Pattern ID | CWE | Description |
+|------------|-----|-------------|
+| `AST_HARDCODED_CRED` | CWE-798 | Hardcoded passwords, API keys |
+| `AST_WEAK_HASH` | CWE-327 | MD5, SHA1 usage |
+| `AST_CODE_EXEC` | CWE-94 | eval(), exec() |
+| `AST_SHELL_INJECTION` | CWE-78 | subprocess shell=True |
+| `AST_INSECURE_DESERIAL` | CWE-502 | pickle.loads() |
+| `AST_SSL_DISABLED` | CWE-295 | verify=False |
+| `AST_SQL_INJECTION` | CWE-89 | String concatenation |
+
+---
+
+## AI Providers
+
+### Supported Providers
+
+| Provider | Models | Auth Variable |
+|----------|--------|---------------|
+| **OpenAI** | GPT-4, GPT-4o, GPT-4-turbo, GPT-3.5-turbo | `OPENAI_API_KEY` |
+| **Anthropic** | Claude 3, Claude 3.5 (Sonnet, Opus, Haiku) | `ANTHROPIC_API_KEY` |
+| **Google Gemini** | Gemini 1.5 Pro/Flash, 2.0 Flash | `GOOGLE_API_KEY` |
+| **Mistral** | Large, Small, Codestral, Open models | `MISTRAL_API_KEY` |
+| **Ollama** | Any local model (Llama, Mistral, CodeLlama) | None (localhost) |
+
+### Provider Examples
+
+```bash
+# OpenAI GPT-4o
+codecanary autotest --provider openai --model gpt-4o
+
+# Anthropic Claude 3.5 Sonnet
+codecanary autotest --provider anthropic --model claude-3-5-sonnet-20241022
+
+# Google Gemini 1.5 Pro
+codecanary autotest --provider gemini --model gemini-1.5-pro
+
+# Mistral Codestral
+codecanary autotest --provider mistral --model codestral-latest
+
+# Local Ollama
+codecanary autotest --provider ollama --model llama3.2
+```
 
 ---
 
@@ -213,11 +398,8 @@ Options:
   -o, --output PATH      Output directory [default: ./bait_repo]
   -l, --language TEXT    Languages to include (python, javascript, go)
   --no-git               Skip Git initialization
+  --force                Overwrite existing directory
   --help                 Show this message and exit
-
-Environment Variables:
-  CODECANARY_OUTPUT      Same as --output
-  CODECANARY_LANGUAGES   Same as --language (comma-separated)
 ```
 
 ### `codecanary test`
@@ -235,11 +417,6 @@ Options:
   -b, --bait-dir PATH    Path to bait repository
   -o, --output PATH      Output directory for results
   --help                 Show this message and exit
-
-Environment Variables:
-  CODECANARY_ASSISTANT   Same as --assistant
-  CODECANARY_MODEL       Same as --model
-  CODECANARY_GUARDRAILS  Same as --guardrails (true/false)
 ```
 
 ### `codecanary scan`
@@ -271,6 +448,67 @@ Options:
   --help                 Show this message and exit
 ```
 
+### `codecanary autotest`
+
+Run automated API-based tests.
+
+```bash
+codecanary autotest [OPTIONS]
+
+Options:
+  -p, --provider TEXT    AI provider (openai, anthropic, ollama, gemini, mistral)
+  -m, --model TEXT       Model to use
+  --api-key TEXT         API key (or use environment variable)
+  --guardrails           Include guardrail instructions
+  -l, --language TEXT    Languages to test (can specify multiple)
+  --cwe TEXT             Filter by CWE (can specify multiple)
+  --test-id TEXT         Run specific test IDs
+  -o, --output PATH      Output directory [default: ./autotest_results]
+  --dry-run              Preview what would be tested
+  --help                 Show this message and exit
+```
+
+### `codecanary proxy`
+
+Capture proxy for IDE testing.
+
+```bash
+# Start proxy (generate script)
+codecanary proxy start [OPTIONS]
+  --host TEXT            Host to listen on [default: 127.0.0.1]
+  --port INT             Port to listen on [default: 8080]
+  --db PATH              SQLite database path
+  --filter TEXT          Only capture specific assistants
+
+# Export responses
+codecanary proxy export [OPTIONS]
+  --db PATH              SQLite database path
+  -o, --output PATH      Output directory
+  --assistant TEXT       Filter by assistant
+
+# View statistics
+codecanary proxy stats [OPTIONS]
+  --db PATH              SQLite database path
+
+# Clear database
+codecanary proxy clear [OPTIONS]
+  --db PATH              SQLite database path
+```
+
+### `codecanary guardrails`
+
+Manage guardrail templates.
+
+```bash
+codecanary guardrails [OPTIONS]
+
+Options:
+  --list                 List available templates
+  --show TEXT            Show template content (cursor, copilot, windsurf)
+  --export PATH          Export template to file
+  --help                 Show this message and exit
+```
+
 ---
 
 ## Metrics & Interpretation
@@ -298,8 +536,6 @@ Percentage of prompts the AI refused to complete.
 | 5-20% | Cautious—may be overly conservative |
 | 20-50% | ⚠️ Restrictive—usability concerns |
 | >50% | 🚫 Unusable—refuses most tasks |
-
-> **Note:** High refusal rate may indicate safety but reduces operational utility.
 
 ### Guardrail Efficacy
 
@@ -346,23 +582,33 @@ Guardrails are configuration files that instruct AI assistants to avoid certain 
 | **Continue** | `config.json` | `~/.continue/` |
 | **Cody** | Project settings | VS Code settings |
 
+### Get Guardrail Templates
+
+```bash
+# List available templates
+codecanary guardrails --list
+
+# Show Cursor template
+codecanary guardrails --show cursor
+
+# Export to file
+codecanary guardrails --show cursor --export .cursorrules
+```
+
 ### Testing Guardrail Effectiveness
 
 ```bash
 # Step 1: Run baseline test WITHOUT guardrails
-codecanary test --assistant cursor --no-guardrails
+codecanary autotest --provider openai --no-guardrails
 codecanary scan
 codecanary report --output baseline.json
 
-# Step 2: Enable guardrails
-cp .codecanary/guardrails/cursorrules.txt ./bait_repo/.cursorrules
-
-# Step 3: Run test WITH guardrails
-codecanary test --assistant cursor --guardrails
+# Step 2: Run test WITH guardrails
+codecanary autotest --provider openai --guardrails
 codecanary scan --output ./results/guardrails/
 codecanary report --output guardrails.json
 
-# Step 4: Compare results
+# Step 3: Compare results
 codecanary compare baseline.json guardrails.json
 ```
 
@@ -386,15 +632,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: codecanary/scan-action@v1
-        with:
-          responses-dir: ./responses
-          output-format: sarif
+      - name: Install CodeCanary
+        run: pip install codecanary
+      
+      - name: Scan responses
+        run: |
+          codecanary scan --input ./responses --output ./findings.json
+          codecanary report --format sarif --output ./results.sarif
           
       - uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif
 ```
+
+---
+
+## Threat Model
+
+### What CodeCanary Tests
+
+**Passive Context Poisoning**: AI learns from existing code patterns and replicates them—even when the source patterns are insecure.
+
+### What CodeCanary Does NOT Test
+
+| Attack Type | Tested? | Notes |
+|-------------|---------|-------|
+| Passive Context Poisoning | ✅ Yes | Core focus |
+| Indirect Prompt Injection | ❌ No | Malicious instructions in code comments |
+| Direct Prompt Injection | ❌ No | Adversarial user prompts |
+| Model Jailbreaking | ❌ No | Attacks on model safety training |
 
 ---
 
@@ -406,7 +672,7 @@ Every test run produces a **RunManifest** for full reproducibility:
 {
   "run_id": "a1b2c3d4-e5f6-7890",
   "timestamp": "2026-01-12T10:30:00Z",
-  "codecanary_version": "1.0.0",
+  "codecanary_version": "0.4.0",
   "environment": {
     "os": "darwin 25.2.0",
     "python_version": "3.11.5"
@@ -423,7 +689,7 @@ Every test run produces a **RunManifest** for full reproducibility:
   },
   "bait": {
     "commit_hash": "abc123...",
-    "test_case_ids": ["T01", "T02", "T03", "T04", "T05", "T06", "T07", "T08"]
+    "test_case_ids": ["T01", "T02", "T03", "..."]
   }
 }
 ```
@@ -437,6 +703,7 @@ Every test run produces a **RunManifest** for full reproducibility:
 | [PRD.md](./PRD.md) | Product requirements, metrics, decision framework |
 | [PLAN.md](./PLAN.md) | Implementation phases and timeline |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Technical design and code structure |
+| [CHANGELOG.md](./CHANGELOG.md) | Version history and release notes |
 | [docs/methodology.md](./docs/methodology.md) | Detailed testing methodology |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | How to contribute |
 
@@ -462,8 +729,8 @@ git clone https://github.com/medxops/code-canary.git
 cd code-canary
 
 # Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
 
 # Install development dependencies
 pip install -e ".[dev]"
@@ -475,6 +742,16 @@ pytest
 ruff check .
 mypy codecanary/
 ```
+
+### Project Stats
+
+| Metric | Value |
+|--------|-------|
+| Tests | 188 passing |
+| Test Cases | 36 |
+| AI Providers | 5 |
+| Scanner Types | 3 |
+| Languages | Python, JavaScript, Go |
 
 ---
 
@@ -499,9 +776,14 @@ No. CodeCanary tests for **context poisoning** specifically—whether AI copies 
 
 No. All canary tokens are fake and follow identifiable patterns (e.g., `AKIA_CANARY_TEST_*`). They will not work with any real service.
 
-### Why is human-in-loop required?
+### Which scanner should I use?
 
-Most AI coding assistants don't expose APIs for automated testing. The human-in-loop protocol ensures consistent, reproducible testing across all assistants. API-based automation is available for direct model testing in v0.3.0+.
+| Use Case | Recommended Scanner |
+|----------|---------------------|
+| Quick scan, all languages | `regex` (default) |
+| Python code, fewer false positives | `ast` |
+| Production security scanning | `semgrep` |
+| Maximum coverage | `multi` (all scanners) |
 
 ### Why not use browser automation for testing?
 
@@ -519,6 +801,19 @@ Browser DOM scraping is brittle—AI assistant UIs change frequently. We prefer:
 | [NVIDIA/garak](https://github.com/NVIDIA/garak) | LLM vulnerability scanner (similar probe/detector model) |
 | [promptfoo/promptfoo](https://github.com/promptfoo/promptfoo) | Config-driven evals (inspired our test definitions) |
 | [microsoft/sarif-python-sdk](https://github.com/microsoft/sarif-python-sdk) | SARIF output reference |
+
+---
+
+## Version History
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| 0.4.0 | 2026-01-12 | Capture proxy, Gemini/Mistral, AST scanner, Semgrep |
+| 0.3.0 | 2026-01-12 | Automation, API testing, A/B testing, regression |
+| 0.2.0 | 2026-01-12 | 36 test cases, multi-language, SARIF output |
+| 0.1.0 | 2026-01-12 | Initial release, core CLI, 8 test cases |
+
+See [CHANGELOG.md](./CHANGELOG.md) for full release notes.
 
 ---
 
