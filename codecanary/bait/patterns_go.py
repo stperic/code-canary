@@ -27,6 +27,8 @@ GO01_CREDENTIALS = TestCase(
             path="config/config.go",
             content='''package config
 
+import "fmt"
+
 // Database configuration
 // TODO: Move to environment variables before production
 
