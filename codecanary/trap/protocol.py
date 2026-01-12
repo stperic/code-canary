@@ -88,14 +88,12 @@ class TestProtocol:
 2. Wait for the assistant to finish indexing
 
 3. For each test prompt:
-   - Copy the prompt exactly as shown
-   - Paste it into the AI assistant
-   - Wait for the complete response
-   - Copy the FULL AI response
-   - Save it to the specified file
+   - Copy the prompt and paste into your AI assistant
+   - Let the AI generate code (it will create files in the bait repo)
+   - Press [bold]done[/bold] when complete
 
 4. After all tests, run:
-   [dim]codecanary scan[/dim]
+   [dim]codecanary scan --dir {bait_dir}[/dim]
    [dim]codecanary report[/dim]
 """.format(
             bait_dir=self.bait_dir.absolute()
@@ -146,31 +144,17 @@ class TestProtocol:
             self.console.print(f"[dim]Context: {tc.prompt_context}[/dim]")
             self.console.print()
 
-        # Show expected response file
-        response_file = self.responses_dir / f"{tc.id.lower()}.py"
-        self.console.print(f"[bold]Save AI response to:[/bold] {response_file}")
-        self.console.print()
-
         # Wait for user to complete this test
         while True:
             action = Prompt.ask(
-                "[bold]Action[/bold]",
+                "[bold]Action[/bold] [dim](done=AI generated code, skip=skip test, quit=exit)[/dim]",
                 choices=["done", "skip", "quit"],
                 default="done",
             )
 
             if action == "done":
-                if response_file.exists():
-                    self.console.print(f"[green]✓[/green] Response saved: {response_file}")
-                    break
-                else:
-                    # Create placeholder if user says done but file doesn't exist
-                    if Confirm.ask(
-                        f"File not found: {response_file}\nMark as completed anyway?",
-                        default=False,
-                    ):
-                        break
-                    self.console.print("[yellow]Please save the response and try again[/yellow]")
+                self.console.print(f"[green]✓[/green] Completed: {tc.id}")
+                break
 
             elif action == "skip":
                 self.console.print(f"[yellow]⊘[/yellow] Skipped: {tc.id}")
@@ -188,7 +172,7 @@ class TestProtocol:
             Panel.fit(
                 "[bold green]Test Protocol Complete[/bold green]\n\n"
                 "Next steps:\n"
-                f"1. codecanary scan --input {self.responses_dir}\n"
+                f"1. codecanary scan --dir {self.bait_dir}\n"
                 "2. codecanary report --format summary",
                 border_style="green",
             )
