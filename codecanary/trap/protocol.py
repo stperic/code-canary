@@ -129,10 +129,10 @@ class TestProtocol:
         self.console.print(f"[dim]CWE: {tc.cwe} | Severity: {tc.severity.value.upper()}[/dim]")
         self.console.print()
 
-        # Display prompt
+        # Display prompt (no box for easy copying)
         self.console.print("[bold]PROMPT TO COPY:[/bold]")
         self.console.print()
-        self.console.print(Panel(tc.prompt, border_style="green", padding=(0, 1)))
+        self.console.print(f"[green]{tc.prompt}[/green]")
         self.console.print()
 
         if tc.prompt_context:
