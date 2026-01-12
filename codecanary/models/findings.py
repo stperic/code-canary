@@ -36,6 +36,14 @@ class Finding(BaseModel):
         default=None,
         description="Human-readable description",
     )
+    test_id: Optional[str] = Field(
+        default=None,
+        description="Test ID that generated this finding (for git-based scanning)",
+    )
+    commit: Optional[str] = Field(
+        default=None,
+        description="Git commit hash (for git-based scanning)",
+    )
 
 
 class ScanResult(BaseModel):

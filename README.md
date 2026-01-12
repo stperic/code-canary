@@ -89,13 +89,27 @@ codecanary test --assistant cursor -d ./test-repo -t T01_AWS_CREDS
 
 # 4. Follow the prompts - paste each into your AI assistant
 #    The AI generates code directly in ./test-repo
+#    Changes are auto-committed with the test ID for precise tracking
 
-# 5. Scan for poisoned patterns (auto-filters to AI-generated files)
+# 5. Scan for poisoned patterns (uses git diff for accurate detection)
 codecanary scan --dir ./test-repo
 
 # 6. Generate your security report
 codecanary report --format summary
 ```
+
+### How Git-Based Scanning Works
+
+CodeCanary uses git to precisely track AI-generated changes:
+
+1. **Auto-commit**: After each test, changes are automatically committed with the test ID
+2. **Git diff scanning**: Only scans the *added lines* from each commit, not existing bait files
+3. **Per-test attribution**: Findings are linked to specific tests for clear reporting
+
+This ensures:
+- ✅ No false positives from bait files
+- ✅ Modified files show only AI-added code
+- ✅ Complete audit trail of what each test generated
 
 ---
 

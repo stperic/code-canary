@@ -267,7 +267,7 @@ def test(
     "-d",
     default=None,
     envvar="CODECANARY_DIR",
-    help="Bait directory to scan (auto-filters to only AI-generated files)",
+    help="Bait directory to scan (uses git diff for precise detection)",
 )
 @click.option(
     "--output",
@@ -284,55 +284,120 @@ def test(
     envvar="CODECANARY_SCANNER",
     help="Scanner backend to use",
 )
-def scan(input: str | None, dir: str | None, output: str, scanner: str) -> None:
+@click.option(
+    "--no-git",
+    is_flag=True,
+    help="Disable git-based scanning (use timestamp fallback)",
+)
+def scan(input: str | None, dir: str | None, output: str, scanner: str, no_git: bool) -> None:
     """Scan AI responses for canary patterns.
 
     Analyzes the AI-generated code for security anti-patterns and
     canary tokens that indicate context poisoning.
 
     \b
-    Two modes of operation:
+    Three modes of operation:
 
-    1. Scan a responses directory:
-        codecanary scan --input ./responses
-
-    2. Scan a bait repo (auto-detects AI-generated files):
+    1. Git-based (recommended): Scans only AI-generated changes via git diff
         codecanary scan --dir ./test-repo
+
+    2. Timestamp-based: Falls back if no git or --no-git specified
+        codecanary scan --dir ./test-repo --no-git
+
+    3. Directory scan: Scans all files in a directory
+        codecanary scan --input ./responses
 
     \b
     Example:
-        codecanary scan --input ./responses
         codecanary scan --dir ./test-repo
         codecanary scan -d ./test-repo -o ./my-results/findings.json
     """
     from codecanary.scanner.analyzer import Analyzer
+    from codecanary.scanner.git_scanner import GitScanner
     from codecanary.bait.generator import BaitGenerator
+    from codecanary.models.findings import ScanResult
 
-    # Determine input path and timestamp filter
-    after_timestamp = None
+    output_path = Path(output)
     
+    # Determine scan mode
     if dir:
         input_path = Path(dir)
-        # Read timestamp from bait repo to filter out original files
-        after_timestamp = BaitGenerator.get_init_timestamp(dir)
+        
+        if not input_path.exists():
+            console.print(f"[red]Error:[/red] Directory not found: {input_path}")
+            console.print("[dim]Run 'codecanary init' first[/dim]")
+            raise SystemExit(1)
+        
+        # Try git-based scanning first (unless --no-git)
+        git_scanner = GitScanner(str(input_path))
+        
+        if not no_git and git_scanner.is_git_repo():
+            commits = git_scanner.get_codecanary_commits()
+            
+            if commits:
+                console.print(f"[dim]Scanning: {input_path}[/dim]")
+                console.print(f"[dim]Mode: git diff (found {len(commits)} test commits)[/dim]")
+                console.print(f"[dim]Scanner: {scanner}[/dim]")
+                
+                # Use the specified scanner
+                if scanner == "ast":
+                    from codecanary.scanner.ast_scanner import ASTScanner
+                    git_scanner.scanner = ASTScanner()
+                elif scanner == "semgrep":
+                    from codecanary.scanner.semgrep_scanner import SemgrepScanner
+                    git_scanner.scanner = SemgrepScanner()
+                
+                all_findings, by_test_id = git_scanner.scan_all()
+                
+                # Create result
+                result = ScanResult(
+                    files_scanned=len(commits),
+                    files_skipped=0,
+                    findings=all_findings,
+                    errors=[],
+                )
+                
+                # Show per-test results
+                if by_test_id:
+                    console.print()
+                    console.print("[bold]Findings by test:[/bold]")
+                    for test_id, findings in by_test_id.items():
+                        if findings:
+                            console.print(f"  {test_id}: [red]{len(findings)} finding(s)[/red]")
+                        else:
+                            console.print(f"  {test_id}: [green]clean[/green]")
+                
+                # Save and display results
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                result.save(str(output_path))
+                
+                console.print()
+                console.print(f"[green]✓[/green] Scanned {len(commits)} test commits")
+                console.print(f"[green]✓[/green] Found {len(all_findings)} finding(s)")
+                console.print(f"[dim]  Results: {output_path}[/dim]")
+                return
+            else:
+                console.print("[dim]No codecanary test commits found, falling back to timestamp[/dim]")
+        
+        # Fallback to timestamp-based
+        after_timestamp = BaitGenerator.get_init_timestamp(str(input_path))
         if after_timestamp:
-            console.print(f"[dim]Filtering to files created after bait init[/dim]")
+            console.print(f"[dim]Mode: timestamp filter[/dim]")
         else:
-            console.print("[yellow]⚠[/yellow] No init timestamp found in bait repo")
+            console.print("[yellow]⚠[/yellow] No init timestamp found")
             console.print("[dim]  Scanning all files (may include bait files)[/dim]")
+            
     elif input:
         input_path = Path(input)
+        after_timestamp = None
     else:
-        # Default to bait_repo if it exists, otherwise responses
+        # Default to bait_repo if it exists
         if Path("./bait_repo").exists():
             input_path = Path("./bait_repo")
             after_timestamp = BaitGenerator.get_init_timestamp("./bait_repo")
-            if after_timestamp:
-                console.print(f"[dim]Using bait_repo, filtering to AI-generated files[/dim]")
         else:
             input_path = Path("./responses")
-
-    output_path = Path(output)
+            after_timestamp = None
 
     if not input_path.exists():
         console.print(f"[red]Error:[/red] Directory not found: {input_path}")

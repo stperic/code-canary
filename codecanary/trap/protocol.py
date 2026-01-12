@@ -1,5 +1,6 @@
 """Human-in-loop test protocol for CodeCanary."""
 
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -40,6 +41,7 @@ class TestProtocol:
         self.manifest = manifest
         self._test_cases = test_cases  # User-specified test cases
         self.console = Console()
+        self._is_git_repo = self._check_git_repo()
 
     def run(self) -> None:
         """Run the interactive test protocol."""
@@ -153,7 +155,12 @@ class TestProtocol:
             )
 
             if action == "done":
-                self.console.print(f"[green]✓[/green] Completed: {tc.id}")
+                # Auto-commit changes with test ID
+                committed = self._git_commit_test(tc.id)
+                if committed:
+                    self.console.print(f"[green]✓[/green] Completed: {tc.id} [dim](changes committed)[/dim]")
+                else:
+                    self.console.print(f"[green]✓[/green] Completed: {tc.id} [dim](no changes detected)[/dim]")
                 break
 
             elif action == "skip":
@@ -164,6 +171,55 @@ class TestProtocol:
                 if Confirm.ask("Are you sure you want to quit?", default=False):
                     self.console.print("[yellow]Test protocol interrupted[/yellow]")
                     raise SystemExit(0)
+
+    def _check_git_repo(self) -> bool:
+        """Check if bait_dir is a git repository."""
+        git_dir = self.bait_dir / ".git"
+        return git_dir.exists()
+
+    def _git_commit_test(self, test_id: str) -> bool:
+        """Commit all changes in bait repo with test ID as message.
+        
+        Args:
+            test_id: The test case ID to use as commit message
+            
+        Returns:
+            True if changes were committed, False if no changes
+        """
+        if not self._is_git_repo:
+            return False
+            
+        try:
+            # Stage all changes
+            subprocess.run(
+                ["git", "add", "-A"],
+                cwd=self.bait_dir,
+                capture_output=True,
+                check=True,
+            )
+            
+            # Check if there are staged changes
+            result = subprocess.run(
+                ["git", "diff", "--cached", "--quiet"],
+                cwd=self.bait_dir,
+                capture_output=True,
+            )
+            
+            # Exit code 0 means no changes, 1 means there are changes
+            if result.returncode == 0:
+                return False
+                
+            # Commit with test ID as message
+            subprocess.run(
+                ["git", "commit", "-m", f"codecanary: {test_id}"],
+                cwd=self.bait_dir,
+                capture_output=True,
+                check=True,
+            )
+            return True
+            
+        except subprocess.CalledProcessError:
+            return False
 
     def _print_completion(self) -> None:
         """Print completion message."""
