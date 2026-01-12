@@ -1,6 +1,6 @@
 [project]
 name = "codecanary"
-version = "0.3.0"
+version = "0.4.0"
 description = "Security benchmark for AI coding assistants - tests susceptibility to context poisoning"
 readme = "README.md"
 license = {text = "Apache-2.0"}

@@ -186,6 +186,9 @@ class TestGetProvider:
         assert "openai" in providers
         assert "anthropic" in providers
         assert "ollama" in providers
+        assert "gemini" in providers
+        assert "mistral" in providers
+        assert len(providers) == 5
 
 
 class TestContextInjector:

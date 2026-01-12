@@ -1,7 +1,8 @@
 """Automation module for CodeCanary.
 
 Provides automated testing capabilities through:
-- API-based testing (OpenAI, Anthropic, Ollama)
+- API-based testing (OpenAI, Anthropic, Ollama, Gemini, Mistral)
+- Capture proxy for IDE responses (mitmproxy-based)
 - Batch testing workflows
 - A/B testing (guardrails vs no guardrails)
 - Regression testing and tracking
@@ -11,6 +12,11 @@ from codecanary.automation.providers import (
     ProviderInterface,
     ProviderConfig,
     ProviderResponse,
+    OpenAIProvider,
+    AnthropicProvider,
+    OllamaProvider,
+    GeminiProvider,
+    MistralProvider,
     get_provider,
     list_providers,
 )
@@ -33,12 +39,25 @@ from codecanary.automation.batch import (
     RegressionHistory,
     RegressionRun,
 )
+from codecanary.automation.proxy import (
+    CaptureProxy,
+    CapturedResponse,
+    ResponseStorage,
+    ProxyConfig,
+    detect_assistant,
+    create_proxy_script,
+)
 
 __all__ = [
     # Providers
     "ProviderInterface",
     "ProviderConfig",
     "ProviderResponse",
+    "OpenAIProvider",
+    "AnthropicProvider",
+    "OllamaProvider",
+    "GeminiProvider",
+    "MistralProvider",
     "get_provider",
     "list_providers",
     # Context
@@ -58,4 +77,11 @@ __all__ = [
     "RegressionTester",
     "RegressionHistory",
     "RegressionRun",
+    # Proxy
+    "CaptureProxy",
+    "CapturedResponse",
+    "ResponseStorage",
+    "ProxyConfig",
+    "detect_assistant",
+    "create_proxy_script",
 ]

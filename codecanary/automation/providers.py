@@ -413,11 +413,231 @@ class OllamaProvider(ProviderInterface):
         return "\n".join(lines)
 
 
+class GeminiProvider(ProviderInterface):
+    """Google Gemini API provider."""
+
+    MODELS = [
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b",
+        "gemini-2.0-flash-exp",
+        "gemini-pro",
+    ]
+
+    def __init__(self, config: Optional[ProviderConfig] = None):
+        """Initialize Gemini provider."""
+        self.config = config or ProviderConfig()
+        self.config.api_key = self.config.api_key or os.environ.get("GOOGLE_API_KEY")
+        self.config.model = self.config.model or "gemini-1.5-flash"
+        self._model: Any = None
+
+    @property
+    def name(self) -> str:
+        return "gemini"
+
+    @property
+    def supported_models(self) -> list[str]:
+        return self.MODELS
+
+    def _get_model(self) -> Any:
+        """Lazy initialization of Gemini model."""
+        if self._model is None:
+            try:
+                import google.generativeai as genai
+
+                genai.configure(api_key=self.config.api_key)
+                self._model = genai.GenerativeModel(self.config.model)
+            except ImportError:
+                raise ImportError(
+                    "Google AI library not installed. Run: pip install google-generativeai"
+                )
+        return self._model
+
+    def validate_config(self) -> bool:
+        """Validate Gemini configuration."""
+        if not self.config.api_key:
+            return False
+        return True
+
+    def complete(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        context_files: Optional[dict[str, str]] = None,
+    ) -> ProviderResponse:
+        """Generate completion using Gemini API."""
+        model = self._get_model()
+
+        # Build full prompt with context
+        full_prompt = ""
+        if system_prompt:
+            full_prompt = f"System Instructions:\n{system_prompt}\n\n"
+        if context_files:
+            full_prompt += self._format_context(context_files) + "\n\n"
+        full_prompt += f"User Request:\n{prompt}"
+
+        # Make request
+        start_time = time.time()
+        response = model.generate_content(full_prompt)
+        latency_ms = (time.time() - start_time) * 1000
+
+        # Rate limiting
+        time.sleep(self.config.rate_limit_delay)
+
+        # Extract text
+        content = ""
+        if response.text:
+            content = response.text
+
+        # Token usage (Gemini doesn't always provide this)
+        prompt_tokens = 0
+        completion_tokens = 0
+        if hasattr(response, "usage_metadata"):
+            prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
+            completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+
+        return ProviderResponse(
+            content=content,
+            model=self.config.model,
+            provider=self.name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+            finish_reason=response.candidates[0].finish_reason.name if response.candidates else "",
+            latency_ms=latency_ms,
+            raw_response=None,  # Gemini response not easily serializable
+        )
+
+    def _format_context(self, context_files: dict[str, str]) -> str:
+        """Format context files for prompt."""
+        lines = ["The following files are in the user's project:", ""]
+        for filepath, content in context_files.items():
+            lines.append(f"--- {filepath} ---")
+            lines.append(content)
+            lines.append("")
+        return "\n".join(lines)
+
+
+class MistralProvider(ProviderInterface):
+    """Mistral AI API provider."""
+
+    MODELS = [
+        "mistral-large-latest",
+        "mistral-medium-latest",
+        "mistral-small-latest",
+        "codestral-latest",
+        "open-mistral-7b",
+        "open-mixtral-8x7b",
+        "open-mixtral-8x22b",
+    ]
+
+    def __init__(self, config: Optional[ProviderConfig] = None):
+        """Initialize Mistral provider."""
+        self.config = config or ProviderConfig()
+        self.config.api_key = self.config.api_key or os.environ.get("MISTRAL_API_KEY")
+        self.config.model = self.config.model or "mistral-small-latest"
+        self._client: Any = None
+
+    @property
+    def name(self) -> str:
+        return "mistral"
+
+    @property
+    def supported_models(self) -> list[str]:
+        return self.MODELS
+
+    def _get_client(self) -> Any:
+        """Lazy initialization of Mistral client."""
+        if self._client is None:
+            try:
+                from mistralai import Mistral
+
+                self._client = Mistral(api_key=self.config.api_key)
+            except ImportError:
+                raise ImportError(
+                    "Mistral library not installed. Run: pip install mistralai"
+                )
+        return self._client
+
+    def validate_config(self) -> bool:
+        """Validate Mistral configuration."""
+        if not self.config.api_key:
+            return False
+        return True
+
+    def complete(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        context_files: Optional[dict[str, str]] = None,
+    ) -> ProviderResponse:
+        """Generate completion using Mistral API."""
+        client = self._get_client()
+
+        # Build messages
+        messages = []
+
+        # System prompt (guardrails + context)
+        system_content = ""
+        if system_prompt:
+            system_content = system_prompt
+        if context_files:
+            if system_content:
+                system_content += "\n\n"
+            system_content += self._format_context(context_files)
+
+        if system_content:
+            messages.append({"role": "system", "content": system_content})
+
+        messages.append({"role": "user", "content": prompt})
+
+        # Make request
+        start_time = time.time()
+        response = client.chat.complete(
+            model=self.config.model,
+            messages=messages,
+            max_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+        )
+        latency_ms = (time.time() - start_time) * 1000
+
+        # Rate limiting
+        time.sleep(self.config.rate_limit_delay)
+
+        content = ""
+        if response.choices:
+            content = response.choices[0].message.content or ""
+
+        return ProviderResponse(
+            content=content,
+            model=response.model,
+            provider=self.name,
+            prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
+            completion_tokens=response.usage.completion_tokens if response.usage else 0,
+            total_tokens=response.usage.total_tokens if response.usage else 0,
+            finish_reason=response.choices[0].finish_reason if response.choices else "",
+            latency_ms=latency_ms,
+            raw_response=response.model_dump() if hasattr(response, "model_dump") else None,
+        )
+
+    def _format_context(self, context_files: dict[str, str]) -> str:
+        """Format context files for system prompt."""
+        lines = ["Project files in the user's repository:", ""]
+        for filepath, content in context_files.items():
+            lines.append(f"```{filepath}")
+            lines.append(content)
+            lines.append("```")
+            lines.append("")
+        return "\n".join(lines)
+
+
 # Provider registry
 PROVIDERS: dict[str, type[ProviderInterface]] = {
     "openai": OpenAIProvider,
     "anthropic": AnthropicProvider,
     "ollama": OllamaProvider,
+    "gemini": GeminiProvider,
+    "mistral": MistralProvider,
 }
 
 

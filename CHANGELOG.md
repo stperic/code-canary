@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-01-12
+
+### Added
+
+#### Capture Proxy (`codecanary/automation/proxy.py`)
+- **mitmproxy integration** - Intercept and capture AI assistant responses from IDEs
+- **Response storage** - SQLite-based storage for captured responses
+- **Assistant detection** - Automatic detection of Cursor, Copilot, Windsurf, OpenAI, Anthropic
+- **CLI commands** - `codecanary proxy start`, `export`, `stats`, `clear`
+- **Proxy script generation** - Standalone mitmproxy script for easy deployment
+
+#### New AI Providers
+- **Google Gemini** - Support for Gemini 1.5 Pro, Flash, and 2.0 Flash
+- **Mistral AI** - Support for Mistral Large, Small, Codestral, and open models
+
+#### AST-Based Scanner (`codecanary/scanner/ast_scanner.py`)
+- **Python AST analysis** - Semantic code analysis for better accuracy
+- **Security visitor** - Detects:
+  - Hardcoded credentials (CWE-798)
+  - Weak cryptography (CWE-327, CWE-328)
+  - Code execution (eval/exec)
+  - Shell injection (subprocess with shell=True)
+  - Insecure deserialization (pickle)
+  - SSL verification disabled
+  - SQL injection patterns
+- **Combined scanner** - Uses both regex and AST for comprehensive coverage
+
+#### Semgrep Integration (`codecanary/scanner/semgrep_scanner.py`)
+- **Production-grade scanning** - Semgrep-powered static analysis
+- **Built-in rules** - CodeCanary-specific Semgrep rules for:
+  - Python security patterns
+  - JavaScript/TypeScript XSS and eval
+  - Go SQL injection
+- **Multi-scanner** - Configurable combination of regex, AST, and Semgrep
+
+### Technical Details
+
+- 188 tests passing (88 new tests)
+- 5 AI providers: OpenAI, Anthropic, Ollama, Gemini, Mistral
+- 3 scanner types: Regex (default), AST (Python), Semgrep (optional)
+
+### Usage Examples
+
+```bash
+# Capture proxy for IDE testing
+codecanary proxy start --port 8080
+codecanary proxy export --output ./responses
+codecanary proxy stats
+
+# Test with new providers
+codecanary autotest --provider gemini --model gemini-1.5-pro
+codecanary autotest --provider mistral --model codestral-latest
+```
+
+### New CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `codecanary proxy start` | Generate and show proxy setup instructions |
+| `codecanary proxy export` | Export captured responses to files |
+| `codecanary proxy stats` | Show capture statistics |
+| `codecanary proxy clear` | Clear all captured responses |
+
+---
+
 ## [0.3.0] - 2026-01-12
 
 ### Added
@@ -204,7 +269,8 @@ codecanary autotest --provider openai --dry-run
 
 ---
 
-[Unreleased]: https://github.com/medxops/code-canary/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/medxops/code-canary/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/medxops/code-canary/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/medxops/code-canary/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/medxops/code-canary/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/medxops/code-canary/releases/tag/v0.1.0

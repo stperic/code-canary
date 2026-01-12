@@ -745,5 +745,192 @@ def autotest(
     console.print("[dim]Run 'codecanary scan' and 'codecanary report' for detailed analysis[/dim]")
 
 
+# =============================================================================
+# Proxy Command Group
+# =============================================================================
+
+
+@cli.group()
+def proxy() -> None:
+    """Capture proxy for intercepting AI assistant responses.
+
+    Uses mitmproxy to capture responses from AI coding assistants
+    when testing through IDEs.
+
+    \b
+    Setup:
+        1. Install mitmproxy: pip install mitmproxy
+        2. Start proxy: codecanary proxy start
+        3. Configure IDE to use proxy (127.0.0.1:8080)
+        4. Install mitmproxy CA certificate
+        5. Use IDE normally - responses are captured
+        6. Export responses: codecanary proxy export
+    """
+    pass
+
+
+@proxy.command(name="start")
+@click.option(
+    "--host",
+    default="127.0.0.1",
+    help="Host to listen on",
+)
+@click.option(
+    "--port",
+    "-p",
+    default=8080,
+    type=int,
+    help="Port to listen on",
+)
+@click.option(
+    "--db",
+    default="./captured_responses.db",
+    help="Path to SQLite database for storing responses",
+)
+@click.option(
+    "--filter",
+    "filter_assistants",
+    multiple=True,
+    type=click.Choice(["cursor", "copilot", "windsurf", "openai", "anthropic"]),
+    help="Only capture these assistants (default: all)",
+)
+def proxy_start(host: str, port: int, db: str, filter_assistants: tuple[str, ...]) -> None:
+    """Start the capture proxy.
+
+    This generates a mitmproxy script and prints instructions for running it.
+
+    \b
+    Example:
+        codecanary proxy start
+        codecanary proxy start --port 9090 --filter cursor
+    """
+    from codecanary.automation.proxy import ProxyConfig, create_proxy_script
+
+    config = ProxyConfig(
+        listen_host=host,
+        listen_port=port,
+        db_path=db,
+        filter_assistants=list(filter_assistants) if filter_assistants else None,
+    )
+
+    # Generate proxy script
+    script_path = Path("./codecanary_proxy.py")
+    script_content = create_proxy_script(config)
+    script_path.write_text(script_content, encoding="utf-8")
+
+    console.print("[bold]CodeCanary Capture Proxy[/bold]")
+    console.print()
+    console.print(f"[green]✓[/green] Proxy script generated: {script_path}")
+    console.print()
+    console.print("[bold]To start capturing:[/bold]")
+    console.print(f"  mitmdump -s {script_path} --listen-host {host} --listen-port {port}")
+    console.print()
+    console.print("[bold]Configure your IDE:[/bold]")
+    console.print(f"  HTTP Proxy: {host}:{port}")
+    console.print()
+    console.print("[bold]Install CA certificate:[/bold]")
+    console.print("  Visit http://mitm.it in your browser while proxy is running")
+    console.print()
+    console.print("[dim]Responses will be saved to:[/dim]", db)
+
+
+@proxy.command(name="export")
+@click.option(
+    "--db",
+    default="./captured_responses.db",
+    help="Path to SQLite database",
+)
+@click.option(
+    "--output",
+    "-o",
+    default="./captured_responses",
+    help="Output directory for response files",
+)
+@click.option(
+    "--assistant",
+    type=click.Choice(["cursor", "copilot", "windsurf", "openai", "anthropic"]),
+    help="Filter by assistant",
+)
+def proxy_export(db: str, output: str, assistant: str | None) -> None:
+    """Export captured responses to files.
+
+    \b
+    Example:
+        codecanary proxy export
+        codecanary proxy export --assistant cursor --output ./cursor_responses
+    """
+    from codecanary.automation.proxy import ResponseStorage
+
+    if not Path(db).exists():
+        console.print(f"[red]Database not found:[/red] {db}")
+        console.print("[dim]Run 'codecanary proxy start' first to capture responses[/dim]")
+        raise SystemExit(1)
+
+    storage = ResponseStorage(db)
+    count = storage.export_to_files(output, assistant)
+
+    console.print(f"[green]✓[/green] Exported {count} responses to: {output}")
+
+
+@proxy.command(name="stats")
+@click.option(
+    "--db",
+    default="./captured_responses.db",
+    help="Path to SQLite database",
+)
+def proxy_stats(db: str) -> None:
+    """Show capture statistics.
+
+    \b
+    Example:
+        codecanary proxy stats
+    """
+    from codecanary.automation.proxy import ResponseStorage
+
+    if not Path(db).exists():
+        console.print(f"[red]Database not found:[/red] {db}")
+        raise SystemExit(1)
+
+    storage = ResponseStorage(db)
+    all_responses = storage.get_all()
+
+    by_assistant: dict[str, int] = {}
+    for resp in all_responses:
+        by_assistant[resp.assistant] = by_assistant.get(resp.assistant, 0) + 1
+
+    console.print("[bold]Capture Statistics[/bold]")
+    console.print(f"  Total captured: {len(all_responses)}")
+    console.print()
+    if by_assistant:
+        console.print("[bold]By Assistant:[/bold]")
+        for assistant, count in sorted(by_assistant.items()):
+            console.print(f"  {assistant}: {count}")
+
+
+@proxy.command(name="clear")
+@click.option(
+    "--db",
+    default="./captured_responses.db",
+    help="Path to SQLite database",
+)
+@click.confirmation_option(prompt="Are you sure you want to clear all captured responses?")
+def proxy_clear(db: str) -> None:
+    """Clear all captured responses.
+
+    \b
+    Example:
+        codecanary proxy clear
+    """
+    from codecanary.automation.proxy import ResponseStorage
+
+    if not Path(db).exists():
+        console.print(f"[dim]Database not found:[/dim] {db}")
+        return
+
+    storage = ResponseStorage(db)
+    storage.clear()
+    console.print("[green]✓[/green] Cleared all captured responses")
+
+
 if __name__ == "__main__":
     cli()

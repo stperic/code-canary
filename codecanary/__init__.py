@@ -1,6 +1,6 @@
 """CodeCanary - Security benchmark for AI coding assistants."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __author__ = "MedXOps"
 
 from codecanary.models.enums import Severity, ResultStatus, DetectionPatternType
