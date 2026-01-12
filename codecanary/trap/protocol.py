@@ -25,6 +25,7 @@ class TestProtocol:
         bait_dir: str = "./bait_repo",
         responses_dir: str = "./responses",
         manifest: Optional[RunManifest] = None,
+        test_cases: Optional[list] = None,
     ):
         """Initialize the test protocol.
 
@@ -32,10 +33,12 @@ class TestProtocol:
             bait_dir: Path to bait repository
             responses_dir: Directory to save AI responses
             manifest: Run manifest for this test run
+            test_cases: Optional list of specific test cases to run
         """
         self.bait_dir = Path(bait_dir)
         self.responses_dir = Path(responses_dir)
         self.manifest = manifest
+        self._test_cases = test_cases  # User-specified test cases
         self.console = Console()
 
     def run(self) -> None:
@@ -46,12 +49,15 @@ class TestProtocol:
         # Create responses directory
         self.responses_dir.mkdir(parents=True, exist_ok=True)
 
-        # Get test cases to run
-        test_cases = TEST_CASES
-        if self.manifest:
+        # Get test cases to run (priority: user-specified > manifest > all)
+        if self._test_cases is not None:
+            test_cases = self._test_cases
+        elif self.manifest:
             test_cases = [
                 tc for tc in TEST_CASES if tc.id in self.manifest.bait.test_case_ids
             ]
+        else:
+            test_cases = TEST_CASES
 
         # Run each test
         for i, tc in enumerate(test_cases, 1):

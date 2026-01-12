@@ -139,6 +139,24 @@ def init(output: str, no_git: bool, force: bool, language: tuple) -> None:
     envvar="CODECANARY_OUTPUT",
     help="Output directory for results",
 )
+@click.option(
+    "--test-id",
+    "-t",
+    multiple=True,
+    help="Run specific test(s) by ID (e.g., -t T01_AWS_CREDS -t T02_DB_PASSWORD)",
+)
+@click.option(
+    "--limit",
+    "-n",
+    type=int,
+    default=None,
+    help="Limit to first N tests",
+)
+@click.option(
+    "--list-tests",
+    is_flag=True,
+    help="List available test IDs and exit",
+)
 def test(
     assistant: str,
     model: str | None,
@@ -146,6 +164,9 @@ def test(
     bait_dir: str,
     responses_dir: str,
     output: str,
+    test_id: tuple[str, ...],
+    limit: int | None,
+    list_tests: bool,
 ) -> None:
     """Run the interactive test protocol.
 
@@ -156,9 +177,25 @@ def test(
     Example:
         codecanary test --assistant cursor --model claude-3.5-sonnet
         codecanary test -a copilot --guardrails
+        codecanary test -a cursor -t T01_AWS_CREDS           # Run one test
+        codecanary test -a cursor -t T01_AWS_CREDS -t T04_SQL_INJECTION
+        codecanary test -a cursor --limit 5                  # Run first 5 tests
+        codecanary test -a cursor --list-tests               # Show available tests
     """
     from codecanary.trap.manifest import create_manifest
     from codecanary.trap.protocol import TestProtocol
+    from codecanary.bait.patterns import TEST_CASES, get_test_case_by_id
+
+    # Handle --list-tests
+    if list_tests:
+        console.print("[bold]Available Test IDs:[/bold]")
+        console.print()
+        for tc in TEST_CASES:
+            lang = getattr(tc, "language", "python")
+            console.print(f"  {tc.id:<25} {tc.cwe:<12} {tc.severity.value:<10} [{lang}]")
+        console.print()
+        console.print(f"[dim]Total: {len(TEST_CASES)} tests[/dim]")
+        return
 
     # Verify bait directory exists
     bait_path = Path(bait_dir)
@@ -166,6 +203,25 @@ def test(
         console.print(f"[red]Error:[/red] Bait directory not found: {bait_dir}")
         console.print("[dim]Run 'codecanary init' first[/dim]")
         raise SystemExit(1)
+
+    # Filter test cases if --test-id provided
+    selected_tests = None
+    if test_id:
+        selected_tests = []
+        for tid in test_id:
+            tc = get_test_case_by_id(tid)
+            if tc:
+                selected_tests.append(tc)
+            else:
+                console.print(f"[yellow]Warning:[/yellow] Test ID not found: {tid}")
+        if not selected_tests:
+            console.print("[red]Error:[/red] No valid test IDs provided")
+            console.print("[dim]Use --list-tests to see available IDs[/dim]")
+            raise SystemExit(1)
+    
+    # Apply --limit if provided
+    if limit is not None and selected_tests is None:
+        selected_tests = TEST_CASES[:limit]
 
     # Create run manifest
     manifest = create_manifest(
@@ -188,6 +244,7 @@ def test(
         bait_dir=bait_dir,
         responses_dir=responses_dir,
         manifest=manifest,
+        test_cases=selected_tests,  # Pass filtered test cases
     )
 
     try:
