@@ -1,0 +1,158 @@
+# CodeCanary Scan Action
+# Scans AI-generated code for context poisoning patterns
+
+name: 'CodeCanary Scan'
+description: 'Scan AI-generated code for security anti-patterns and canary tokens'
+author: 'MedXOps'
+branding:
+  icon: 'shield'
+  color: 'yellow'
+
+inputs:
+  responses-dir:
+    description: 'Directory containing AI-generated responses'
+    required: true
+    default: './responses'
+  output-dir:
+    description: 'Directory for output files'
+    required: false
+    default: './results'
+  output-format:
+    description: 'Output format (json, sarif, summary)'
+    required: false
+    default: 'json'
+  scanner:
+    description: 'Scanner backend (regex, ast, semgrep)'
+    required: false
+    default: 'regex'
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.11'
+  fail-on-findings:
+    description: 'Fail the action if any canary patterns are found'
+    required: false
+    default: 'true'
+
+outputs:
+  findings-count:
+    description: 'Number of canary patterns detected'
+    value: ${{ steps.scan.outputs.findings_count }}
+  ctr:
+    description: 'Canary Trigger Rate (if report generated)'
+    value: ${{ steps.report.outputs.ctr }}
+  findings-file:
+    description: 'Path to findings JSON file'
+    value: ${{ steps.scan.outputs.findings_file }}
+  report-file:
+    description: 'Path to report file'
+    value: ${{ steps.report.outputs.report_file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install CodeCanary
+      shell: bash
+      run: |
+        pip install codecanary
+
+    - name: Create output directory
+      shell: bash
+      run: |
+        mkdir -p ${{ inputs.output-dir }}
+
+    - name: Scan responses
+      id: scan
+      shell: bash
+      run: |
+        FINDINGS_FILE="${{ inputs.output-dir }}/findings.json"
+        
+        codecanary scan \
+          --input "${{ inputs.responses-dir }}" \
+          --output "$FINDINGS_FILE" \
+          --scanner "${{ inputs.scanner }}"
+        
+        # Parse findings count from JSON
+        if [ -f "$FINDINGS_FILE" ]; then
+          FINDINGS_COUNT=$(python -c "import json; data=json.load(open('$FINDINGS_FILE')); print(len(data.get('findings', [])))")
+          echo "findings_count=$FINDINGS_COUNT" >> $GITHUB_OUTPUT
+          echo "findings_file=$FINDINGS_FILE" >> $GITHUB_OUTPUT
+        else
+          echo "findings_count=0" >> $GITHUB_OUTPUT
+          echo "findings_file=" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Generate report
+      id: report
+      shell: bash
+      if: inputs.output-format != 'summary'
+      run: |
+        REPORT_FILE="${{ inputs.output-dir }}/report.${{ inputs.output-format }}"
+        MANIFEST_FILE="${{ inputs.output-dir }}/run_manifest.json"
+        
+        # Create a minimal manifest for CI if one doesn't exist
+        if [ ! -f "$MANIFEST_FILE" ]; then
+          cat > "$MANIFEST_FILE" << 'EOF'
+        {
+          "run_id": "${{ github.run_id }}",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "codecanary_version": "0.1.0",
+          "environment": {
+            "os": "${{ runner.os }}",
+            "python_version": "${{ inputs.python-version }}",
+            "ci": true,
+            "github_workflow": "${{ github.workflow }}",
+            "github_ref": "${{ github.ref }}"
+          },
+          "assistant": {
+            "name": "unknown",
+            "version": "unknown"
+          },
+          "guardrails": {
+            "enabled": false
+          },
+          "bait": {
+            "directory": "unknown",
+            "commit_hash": "unknown"
+          }
+        }
+        EOF
+        fi
+        
+        if [ "${{ inputs.output-format }}" = "json" ]; then
+          codecanary report \
+            --input "${{ inputs.output-dir }}/findings.json" \
+            --manifest "$MANIFEST_FILE" \
+            --output "$REPORT_FILE" \
+            --format json
+          
+          # Extract CTR from report
+          if [ -f "$REPORT_FILE" ]; then
+            CTR=$(python -c "import json; data=json.load(open('$REPORT_FILE')); print(data.get('summary', {}).get('ctr', 0))")
+            echo "ctr=$CTR" >> $GITHUB_OUTPUT
+          fi
+        fi
+        
+        echo "report_file=$REPORT_FILE" >> $GITHUB_OUTPUT
+
+    - name: Display summary
+      shell: bash
+      run: |
+        codecanary report \
+          --input "${{ inputs.output-dir }}/findings.json" \
+          --format summary
+
+    - name: Check for findings
+      shell: bash
+      if: inputs.fail-on-findings == 'true'
+      run: |
+        FINDINGS_COUNT="${{ steps.scan.outputs.findings_count }}"
+        if [ "$FINDINGS_COUNT" != "0" ] && [ "$FINDINGS_COUNT" != "" ]; then
+          echo "::error::Found $FINDINGS_COUNT canary pattern(s) in AI-generated code"
+          exit 1
+        fi

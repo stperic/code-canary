@@ -1,0 +1,75 @@
+# Example CodeCanary workflow for CI/CD
+# Copy this file to your repository's .github/workflows/ directory
+
+name: CodeCanary Scan
+
+on:
+  # Scan when responses are added/modified
+  push:
+    paths:
+      - 'responses/**'
+  pull_request:
+    paths:
+      - 'responses/**'
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      responses-dir:
+        description: 'Directory containing AI responses'
+        required: false
+        default: './responses'
+
+jobs:
+  scan:
+    name: Scan AI Responses
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      security-events: write  # For SARIF upload
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install CodeCanary
+        run: pip install codecanary
+
+      - name: Scan responses
+        id: scan
+        run: |
+          RESPONSES_DIR="${{ github.event.inputs.responses-dir || './responses' }}"
+          mkdir -p ./results
+          
+          codecanary scan \
+            --input "$RESPONSES_DIR" \
+            --output ./results/findings.json \
+            --scanner regex
+          
+          # Count findings
+          FINDINGS=$(python -c "import json; data=json.load(open('./results/findings.json')); print(len(data.get('findings', [])))")
+          echo "findings_count=$FINDINGS" >> $GITHUB_OUTPUT
+
+      - name: Generate report
+        run: |
+          codecanary report \
+            --input ./results/findings.json \
+            --format summary
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: codecanary-results
+          path: ./results/
+          retention-days: 30
+
+      - name: Fail on findings
+        if: steps.scan.outputs.findings_count != '0'
+        run: |
+          echo "::error::Found ${{ steps.scan.outputs.findings_count }} canary pattern(s)"
+          exit 1
