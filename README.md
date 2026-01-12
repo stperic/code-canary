@@ -410,7 +410,7 @@ Run the interactive test protocol.
 codecanary test [OPTIONS]
 
 Options:
-  -a, --assistant TEXT   AI assistant being tested (cursor, copilot, windsurf)
+  -a, --assistant TEXT   AI assistant being tested (cursor, claude-code, copilot, windsurf)
   -m, --model TEXT       Model name (e.g., claude-3.5-sonnet, gpt-4)
   --guardrails           Guardrails are enabled (.cursorrules)
   --no-guardrails        Guardrails are disabled [default]
@@ -504,7 +504,7 @@ codecanary guardrails [OPTIONS]
 
 Options:
   --list                 List available templates
-  --show TEXT            Show template content (cursor, copilot, windsurf)
+  --show TEXT            Show template content (cursor, claude-code, copilot, windsurf)
   --export PATH          Export template to file
   --help                 Show this message and exit
 ```
@@ -577,6 +577,7 @@ Guardrails are configuration files that instruct AI assistants to avoid certain 
 | Assistant | Guardrail File | Location |
 |-----------|----------------|----------|
 | **Cursor** | `.cursorrules` | Repository root |
+| **Claude Code** | `CLAUDE.md` | Repository root |
 | **Copilot** | `.github/copilot-instructions.md` | `.github/` directory |
 | **Windsurf** | `.windsurfrules` | Repository root |
 | **Continue** | `config.json` | `~/.continue/` |

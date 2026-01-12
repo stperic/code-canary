@@ -163,6 +163,11 @@ class TestDetectAssistant:
         assert detect_assistant("https://api.cursor.sh/v1/chat") == "cursor"
         assert detect_assistant("https://cursorai.com/api") == "cursor"
 
+    def test_detect_claude_code(self):
+        """Should detect Claude Code."""
+        assert detect_assistant("https://claude.ai/api/chat") == "claude-code"
+        assert detect_assistant("https://anthropic.com/claude-code/v1") == "claude-code"
+
     def test_detect_copilot(self):
         """Should detect Copilot."""
         assert detect_assistant("https://api.github.com/copilot/chat") == "copilot"

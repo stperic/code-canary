@@ -103,7 +103,7 @@ def init(output: str, no_git: bool, force: bool, language: tuple) -> None:
     "-a",
     required=True,
     envvar="CODECANARY_ASSISTANT",
-    type=click.Choice(["cursor", "copilot", "windsurf", "continue", "cody", "other"]),
+    type=click.Choice(["cursor", "claude-code", "copilot", "windsurf", "continue", "cody", "other"]),
     help="AI assistant being tested",
 )
 @click.option(
@@ -414,7 +414,7 @@ def compare(baseline: str, comparison: str) -> None:
 @click.option(
     "--assistant",
     "-a",
-    type=click.Choice(["cursor", "copilot", "windsurf"]),
+    type=click.Choice(["cursor", "claude-code", "copilot", "windsurf"]),
     help="Show guardrails for specific assistant",
 )
 @click.option(
@@ -791,7 +791,7 @@ def proxy() -> None:
     "--filter",
     "filter_assistants",
     multiple=True,
-    type=click.Choice(["cursor", "copilot", "windsurf", "openai", "anthropic"]),
+    type=click.Choice(["cursor", "claude-code", "copilot", "windsurf", "openai", "anthropic"]),
     help="Only capture these assistants (default: all)",
 )
 def proxy_start(host: str, port: int, db: str, filter_assistants: tuple[str, ...]) -> None:
@@ -848,7 +848,7 @@ def proxy_start(host: str, port: int, db: str, filter_assistants: tuple[str, ...
 )
 @click.option(
     "--assistant",
-    type=click.Choice(["cursor", "copilot", "windsurf", "openai", "anthropic"]),
+    type=click.Choice(["cursor", "claude-code", "copilot", "windsurf", "openai", "anthropic"]),
     help="Filter by assistant",
 )
 def proxy_export(db: str, output: str, assistant: str | None) -> None:

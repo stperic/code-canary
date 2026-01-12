@@ -20,7 +20,7 @@ class CapturedResponse:
 
     id: str
     timestamp: str
-    assistant: str  # cursor, copilot, windsurf
+    assistant: str  # cursor, claude-code, copilot, windsurf
     url: str
     request_body: Optional[str]
     response_body: str
@@ -249,6 +249,11 @@ ASSISTANT_PATTERNS = {
         r"api\.cursor\.sh",
         r"cursor-ai",
         r"cursorai",
+    ],
+    "claude-code": [
+        r"claude\.ai",
+        r"anthropic.*claude",
+        r"claude-code",
     ],
     "copilot": [
         r"copilot\.github",

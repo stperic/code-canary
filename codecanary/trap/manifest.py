@@ -26,7 +26,7 @@ def create_manifest(
     """Create a run manifest for a test run.
 
     Args:
-        assistant: AI assistant name (cursor, copilot, windsurf, etc.)
+        assistant: AI assistant name (cursor, claude-code, copilot, windsurf, etc.)
         model: Model name (e.g., claude-3.5-sonnet)
         guardrails_enabled: Whether guardrails are enabled
         guardrails_file: Path to guardrails file (e.g., .cursorrules)

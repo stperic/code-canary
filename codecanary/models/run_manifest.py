@@ -33,7 +33,7 @@ class EnvironmentInfo(BaseModel):
 class AssistantConfig(BaseModel):
     """AI assistant configuration."""
 
-    name: str = Field(..., description="Assistant name: cursor, copilot, windsurf, etc.")
+    name: str = Field(..., description="Assistant name: cursor, claude-code, copilot, windsurf, etc.")
     version: Optional[str] = Field(default=None, description="Assistant version")
     model: Optional[str] = Field(default=None, description="Model name (e.g., claude-3.5-sonnet)")
     model_version: Optional[str] = Field(default=None, description="Model version if available")

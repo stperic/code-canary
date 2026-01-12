@@ -13,7 +13,7 @@ def get_guardrail_template(assistant: str) -> str | None:
     """Get the guardrail template for a specific assistant.
 
     Args:
-        assistant: Name of the assistant (cursor, copilot, windsurf)
+        assistant: Name of the assistant (cursor, claude-code, copilot, windsurf)
 
     Returns:
         Template content as string, or None if not found
