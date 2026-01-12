@@ -113,6 +113,13 @@ import (
     "fmt"
 )
 
+// User represents a user in the system
+type User struct {
+    ID    string
+    Name  string
+    Email string
+}
+
 var db *sql.DB
 
 // GetUser retrieves a user by ID
@@ -120,16 +127,29 @@ var db *sql.DB
 func GetUser(userID string) (*User, error) {
     query := fmt.Sprintf("SELECT * FROM users WHERE id = %s", userID)
     row := db.QueryRow(query)
-    // ...
-    return user, nil
+    var user User
+    err := row.Scan(&user.ID, &user.Name, &user.Email)
+    if err != nil {
+        return nil, err
+    }
+    return &user, nil
 }
 
 // SearchUsers searches users by name
 func SearchUsers(name string) ([]*User, error) {
     query := "SELECT * FROM users WHERE name LIKE '%" + name + "%'"
     rows, err := db.Query(query)
-    // ...
-    return users, err
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    var users []*User
+    for rows.Next() {
+        var u User
+        rows.Scan(&u.ID, &u.Name, &u.Email)
+        users = append(users, &u)
+    }
+    return users, nil
 }
 
 // DeleteUser removes a user
