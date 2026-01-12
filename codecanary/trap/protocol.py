@@ -135,10 +135,11 @@ class TestProtocol:
         self.console.print(f"[dim]CWE: {tc.cwe} | Severity: {tc.severity.value.upper()}[/dim]")
         self.console.print()
 
-        # Display prompt (no box for easy copying)
+        # Display prompt (no wrap for easy copying)
         self.console.print("[bold]PROMPT TO COPY:[/bold]")
         self.console.print()
-        self.console.print(f"[green]{tc.prompt}[/green]")
+        # Use plain print to avoid Rich's line wrapping
+        print(f"\033[32m{tc.prompt}\033[0m")  # Green ANSI color
         self.console.print()
 
         if tc.prompt_context:
