@@ -29,11 +29,11 @@ def cli() -> None:
 
 @cli.command()
 @click.option(
-    "--output",
-    "-o",
+    "--dir",
+    "-d",
     default="./bait_repo",
-    envvar="CODECANARY_OUTPUT",
-    help="Output directory for bait repository",
+    envvar="CODECANARY_DIR",
+    help="Directory for bait repository",
 )
 @click.option(
     "--no-git",
@@ -55,7 +55,7 @@ def cli() -> None:
     envvar="CODECANARY_LANGUAGES",
     help="Languages to include (python, javascript, go)",
 )
-def init(output: str, no_git: bool, force: bool, language: tuple) -> None:
+def init(dir: str, no_git: bool, force: bool, language: tuple) -> None:
     """Generate a bait repository with canary tokens.
 
     Creates a fake "legacy" codebase containing intentional security
@@ -63,14 +63,14 @@ def init(output: str, no_git: bool, force: bool, language: tuple) -> None:
 
     \b
     Example:
-        codecanary init --output ./my-bait
-        codecanary init -l python -l javascript
+        codecanary init --dir ./my-bait
+        codecanary init -d ./test-repo -l python -l javascript
     """
     from codecanary.bait.generator import BaitGenerator
 
     try:
         generator = BaitGenerator(
-            output_dir=output,
+            output_dir=dir,
             init_git=not no_git,
             languages=list(language),
         )
@@ -119,10 +119,10 @@ def init(output: str, no_git: bool, force: bool, language: tuple) -> None:
     help="Whether guardrails are enabled",
 )
 @click.option(
-    "--bait-dir",
-    "-b",
+    "--dir",
+    "-d",
     default="./bait_repo",
-    envvar="CODECANARY_BAIT_DIR",
+    envvar="CODECANARY_DIR",
     help="Path to bait repository",
 )
 @click.option(
@@ -161,7 +161,7 @@ def test(
     assistant: str,
     model: str | None,
     guardrails: bool,
-    bait_dir: str,
+    dir: str,
     responses_dir: str,
     output: str,
     test_id: tuple[str, ...],
@@ -175,7 +175,7 @@ def test(
 
     \b
     Example:
-        codecanary test --assistant cursor --model claude-3.5-sonnet
+        codecanary test -a cursor -d ./test-repo
         codecanary test -a copilot --guardrails
         codecanary test -a cursor -t T01_AWS_CREDS           # Run one test
         codecanary test -a cursor -t T01_AWS_CREDS -t T04_SQL_INJECTION
@@ -198,9 +198,9 @@ def test(
         return
 
     # Verify bait directory exists
-    bait_path = Path(bait_dir)
+    bait_path = Path(dir)
     if not bait_path.exists():
-        console.print(f"[red]Error:[/red] Bait directory not found: {bait_dir}")
+        console.print(f"[red]Error:[/red] Bait directory not found: {dir}")
         console.print("[dim]Run 'codecanary init' first[/dim]")
         raise SystemExit(1)
 
@@ -228,7 +228,7 @@ def test(
         assistant=assistant,
         model=model,
         guardrails_enabled=guardrails,
-        bait_dir=bait_dir,
+        bait_dir=dir,
     )
 
     # Save manifest
@@ -241,7 +241,7 @@ def test(
 
     # Run protocol
     protocol = TestProtocol(
-        bait_dir=bait_dir,
+        bait_dir=dir,
         responses_dir=responses_dir,
         manifest=manifest,
         test_cases=selected_tests,  # Pass filtered test cases
@@ -260,13 +260,13 @@ def test(
     "-i",
     default=None,
     envvar="CODECANARY_SCAN_INPUT",
-    help="Directory containing AI responses (or use --bait-dir)",
+    help="Directory containing AI responses (or use --dir)",
 )
 @click.option(
-    "--bait-dir",
-    "-b",
+    "--dir",
+    "-d",
     default=None,
-    envvar="CODECANARY_BAIT_DIR",
+    envvar="CODECANARY_DIR",
     help="Bait directory to scan (auto-filters to only AI-generated files)",
 )
 @click.option(
@@ -284,7 +284,7 @@ def test(
     envvar="CODECANARY_SCANNER",
     help="Scanner backend to use",
 )
-def scan(input: str | None, bait_dir: str | None, output: str, scanner: str) -> None:
+def scan(input: str | None, dir: str | None, output: str, scanner: str) -> None:
     """Scan AI responses for canary patterns.
 
     Analyzes the AI-generated code for security anti-patterns and
@@ -297,13 +297,13 @@ def scan(input: str | None, bait_dir: str | None, output: str, scanner: str) -> 
         codecanary scan --input ./responses
 
     2. Scan a bait repo (auto-detects AI-generated files):
-        codecanary scan --bait-dir ./test-repo
+        codecanary scan --dir ./test-repo
 
     \b
     Example:
         codecanary scan --input ./responses
-        codecanary scan --bait-dir ./test-repo
-        codecanary scan -b ./test-repo -o ./my-results/findings.json
+        codecanary scan --dir ./test-repo
+        codecanary scan -d ./test-repo -o ./my-results/findings.json
     """
     from codecanary.scanner.analyzer import Analyzer
     from codecanary.bait.generator import BaitGenerator
@@ -311,10 +311,10 @@ def scan(input: str | None, bait_dir: str | None, output: str, scanner: str) -> 
     # Determine input path and timestamp filter
     after_timestamp = None
     
-    if bait_dir:
-        input_path = Path(bait_dir)
+    if dir:
+        input_path = Path(dir)
         # Read timestamp from bait repo to filter out original files
-        after_timestamp = BaitGenerator.get_init_timestamp(bait_dir)
+        after_timestamp = BaitGenerator.get_init_timestamp(dir)
         if after_timestamp:
             console.print(f"[dim]Filtering to files created after bait init[/dim]")
         else:
@@ -571,8 +571,8 @@ def guardrails(assistant: str | None, list_all: bool, output: str | None) -> Non
 
 @cli.command()
 @click.option(
-    "--bait-dir",
-    "-b",
+    "--dir",
+    "-d",
     default="./bait_repo",
     help="Bait repository to clean",
 )
@@ -600,7 +600,7 @@ def guardrails(assistant: str | None, list_all: bool, output: str | None) -> Non
     help="Show what would be deleted without deleting",
 )
 def clean(
-    bait_dir: str,
+    dir: str,
     results_dir: str,
     responses_dir: str,
     clean_all: bool,
@@ -614,17 +614,17 @@ def clean(
     \b
     Example:
         codecanary clean --all
-        codecanary clean --bait-dir ./my-bait --dry-run
+        codecanary clean --dir ./my-bait --dry-run
     """
     import shutil
 
     dirs_to_clean = []
 
     if clean_all:
-        dirs_to_clean = [bait_dir, results_dir, responses_dir]
+        dirs_to_clean = [dir, results_dir, responses_dir]
     else:
         # Only clean if explicitly specified or defaults exist
-        for d in [bait_dir, results_dir, responses_dir]:
+        for d in [dir, results_dir, responses_dir]:
             if Path(d).exists():
                 dirs_to_clean.append(d)
 

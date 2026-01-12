@@ -31,7 +31,7 @@ class TestFullWorkflow:
         """codecanary init should create a valid bait repository."""
         bait_dir = temp_workspace / "bait_repo"
 
-        result = runner.invoke(cli, ["init", "--output", str(bait_dir)])
+        result = runner.invoke(cli, ["init", "--dir", str(bait_dir)])
 
         assert result.exit_code == 0, f"Failed: {result.output}"
         assert bait_dir.exists()
@@ -43,7 +43,7 @@ class TestFullWorkflow:
         """codecanary init --no-git should skip Git initialization."""
         bait_dir = temp_workspace / "bait_no_git"
 
-        result = runner.invoke(cli, ["init", "--output", str(bait_dir), "--no-git"])
+        result = runner.invoke(cli, ["init", "--dir", str(bait_dir), "--no-git"])
 
         assert result.exit_code == 0, f"Failed: {result.output}"
         assert bait_dir.exists()
@@ -55,7 +55,7 @@ class TestFullWorkflow:
         bait_dir = temp_workspace / "existing"
         bait_dir.mkdir()
 
-        result = runner.invoke(cli, ["init", "--output", str(bait_dir)])
+        result = runner.invoke(cli, ["init", "--dir", str(bait_dir)])
 
         assert result.exit_code == 1
         assert "Error" in result.output
@@ -66,7 +66,7 @@ class TestFullWorkflow:
         bait_dir.mkdir()
         (bait_dir / "old_file.txt").write_text("old content")
 
-        result = runner.invoke(cli, ["init", "--output", str(bait_dir), "--force"])
+        result = runner.invoke(cli, ["init", "--dir", str(bait_dir), "--force"])
 
         assert result.exit_code == 0, f"Failed: {result.output}"
         assert not (bait_dir / "old_file.txt").exists()
@@ -173,7 +173,7 @@ query = f"SELECT * FROM users WHERE id = {user_id}"
         results_dir = temp_workspace / "results"
 
         # Step 1: Initialize bait repository
-        result = runner.invoke(cli, ["init", "--output", str(bait_dir), "--no-git"])
+        result = runner.invoke(cli, ["init", "--dir", str(bait_dir), "--no-git"])
         assert result.exit_code == 0, f"Init failed: {result.output}"
 
         # Step 2: Simulate AI response (copy bait pattern)
@@ -231,7 +231,7 @@ class TestCLIHelp:
         """init command should show help."""
         result = runner.invoke(cli, ["init", "--help"])
         assert result.exit_code == 0
-        assert "--output" in result.output
+        assert "--dir" in result.output
         assert "--no-git" in result.output
 
     def test_scan_help(self, runner):

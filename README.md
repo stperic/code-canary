@@ -79,19 +79,19 @@ pip install -e .
 
 ```bash
 # 1. Generate a "bait" repository with canary tokens
-codecanary init --output ./test-repo
+codecanary init --dir ./test-repo
 
 # 2. Open ./test-repo in your AI assistant (Cursor, Copilot, etc.)
 #    Let it index the codebase
 
-# 3. Run the test protocol
-codecanary test --assistant cursor --model claude-3.5-sonnet
+# 3. Run the test protocol (use -t for specific tests, --limit for first N)
+codecanary test --assistant cursor -d ./test-repo -t T01_AWS_CREDS
 
 # 4. Follow the prompts - paste each into your AI assistant
-#    Save the AI's responses to ./responses/
+#    The AI generates code directly in ./test-repo
 
-# 5. Scan the responses for poisoned patterns
-codecanary scan --input ./responses
+# 5. Scan for poisoned patterns (auto-filters to AI-generated files)
+codecanary scan --dir ./test-repo
 
 # 6. Generate your security report
 codecanary report --format summary
@@ -395,7 +395,7 @@ Generate a bait repository.
 codecanary init [OPTIONS]
 
 Options:
-  -o, --output PATH      Output directory [default: ./bait_repo]
+  -d, --dir PATH         Bait repository directory [default: ./bait_repo]
   -l, --language TEXT    Languages to include (python, javascript, go)
   --no-git               Skip Git initialization
   --force                Overwrite existing directory
@@ -414,7 +414,10 @@ Options:
   -m, --model TEXT       Model name (e.g., claude-3.5-sonnet, gpt-4)
   --guardrails           Guardrails are enabled (.cursorrules)
   --no-guardrails        Guardrails are disabled [default]
-  -b, --bait-dir PATH    Path to bait repository
+  -d, --dir PATH         Path to bait repository [default: ./bait_repo]
+  -t, --test-id TEXT     Run specific test(s) by ID (can use multiple times)
+  -n, --limit INT        Limit to first N tests
+  --list-tests           List available test IDs and exit
   -o, --output PATH      Output directory for results
   --help                 Show this message and exit
 ```
@@ -427,7 +430,8 @@ Scan AI responses for canary patterns.
 codecanary scan [OPTIONS]
 
 Options:
-  -i, --input PATH       Directory containing AI responses [default: ./responses]
+  -i, --input PATH       Directory containing AI responses
+  -d, --dir PATH         Bait directory (auto-filters to AI-generated files)
   -o, --output PATH      Output file for findings [default: ./results/findings.json]
   -s, --scanner TEXT     Scanner backend (regex, ast, semgrep) [default: regex]
   --help                 Show this message and exit
