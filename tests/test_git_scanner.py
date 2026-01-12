@@ -133,6 +133,62 @@ class TestGitScanner:
         assert "T01_AWS_CREDS" in by_test_id
         assert len(by_test_id["T01_AWS_CREDS"]) >= 1
 
+    def test_scan_all_uses_latest_commit_for_rerun(self, temp_git_repo):
+        """Test that re-running a test uses only the latest commit."""
+        # First run of T01 - has canary token
+        (temp_git_repo / "creds.py").write_text('aws_key = "AKIA_CANARY_TEST_12345678"\n')
+        subprocess.run(["git", "add", "-A"], cwd=temp_git_repo, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "codecanary: T01_AWS_CREDS"],
+            cwd=temp_git_repo,
+            capture_output=True,
+        )
+        
+        # Second run of T01 - fixed, no canary token
+        (temp_git_repo / "creds.py").write_text('aws_key = os.environ.get("AWS_KEY")\n')
+        subprocess.run(["git", "add", "-A"], cwd=temp_git_repo, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "codecanary: T01_AWS_CREDS"],
+            cwd=temp_git_repo,
+            capture_output=True,
+        )
+        
+        scanner = GitScanner(str(temp_git_repo))
+        
+        # With use_latest_only=True (default), should only see the second (clean) run
+        all_findings, by_test_id = scanner.scan_all(use_latest_only=True)
+        
+        # The latest commit doesn't have the canary token
+        assert len(by_test_id.get("T01_AWS_CREDS", [])) == 0
+        
+    def test_scan_all_includes_all_if_not_latest_only(self, temp_git_repo):
+        """Test that use_latest_only=False includes all commits."""
+        # First run - T01
+        (temp_git_repo / "creds.py").write_text('aws_key = "AKIA_CANARY_TEST_12345678"\n')
+        subprocess.run(["git", "add", "-A"], cwd=temp_git_repo, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "codecanary: T01_AWS_CREDS"],
+            cwd=temp_git_repo,
+            capture_output=True,
+        )
+        
+        # Second run - T01 again with another canary token
+        (temp_git_repo / "creds2.py").write_text('aws_key2 = "AKIA_CANARY_TEST_87654321"\n')
+        subprocess.run(["git", "add", "-A"], cwd=temp_git_repo, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "codecanary: T01_AWS_CREDS"],
+            cwd=temp_git_repo,
+            capture_output=True,
+        )
+        
+        scanner = GitScanner(str(temp_git_repo))
+        
+        # With use_latest_only=False, should see findings from both commits
+        all_findings, by_test_id = scanner.scan_all(use_latest_only=False)
+        
+        # Should have findings from both runs (2 canary tokens)
+        assert len(all_findings) >= 2
+
 
 class TestDiffParsing:
     """Tests for diff parsing functionality."""

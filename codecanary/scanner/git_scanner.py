@@ -268,8 +268,12 @@ class GitScanner:
         
         return findings
     
-    def scan_all(self) -> tuple[list[Finding], dict[str, list[Finding]]]:
+    def scan_all(self, use_latest_only: bool = True) -> tuple[list[Finding], dict[str, list[Finding]]]:
         """Scan all codecanary commits for canary patterns.
+        
+        Args:
+            use_latest_only: If True, only scan the most recent commit for each test ID.
+                           If False, scan all commits (may have duplicates for re-run tests).
         
         Returns:
             Tuple of (all_findings, findings_by_test_id)
@@ -277,10 +281,20 @@ class GitScanner:
         if not self.is_git_repo():
             return [], {}
         
+        commits = self.get_codecanary_commits()
+        
+        # If use_latest_only, keep only the last commit for each test ID
+        if use_latest_only:
+            # Commits are in chronological order (oldest first from --reverse)
+            # So we iterate and keep overwriting - last one wins
+            latest_by_test: dict[str, GitCommit] = {}
+            for commit in commits:
+                if commit.test_id:
+                    latest_by_test[commit.test_id] = commit
+            commits = list(latest_by_test.values())
+        
         all_findings = []
         by_test_id: dict[str, list[Finding]] = {}
-        
-        commits = self.get_codecanary_commits()
         
         for commit in commits:
             commit_findings = self.scan_commit(commit)
