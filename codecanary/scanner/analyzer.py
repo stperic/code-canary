@@ -229,11 +229,17 @@ class Analyzer:
 
         return all_findings
 
-    def scan_directory(self, directory: Path) -> ScanResult:
+    def scan_directory(
+        self,
+        directory: Path,
+        after_timestamp: Optional[float] = None,
+    ) -> ScanResult:
         """Scan all files in a directory.
 
         Args:
             directory: Directory to scan
+            after_timestamp: Only scan files modified after this Unix timestamp
+                           (used to filter AI-generated files from bait files)
 
         Returns:
             ScanResult with all findings
@@ -258,6 +264,17 @@ class Analyzer:
             if not should_scan(filepath):
                 files_skipped += 1
                 continue
+
+            # Filter by timestamp if provided
+            if after_timestamp is not None:
+                try:
+                    file_mtime = filepath.stat().st_mtime
+                    if file_mtime <= after_timestamp:
+                        files_skipped += 1
+                        continue
+                except OSError:
+                    files_skipped += 1
+                    continue
 
             try:
                 findings = self.scan_file(filepath)

@@ -8,12 +8,18 @@ from pathlib import Path
 import subprocess
 import shutil
 import os
+import time
+from datetime import datetime, timezone
 from typing import Optional
 
 import yaml
 
 from codecanary.bait.patterns import TEST_CASES, get_test_cases
 from codecanary.models.test_case import TestCase
+
+
+# Timestamp file for tracking when bait repo was created
+TIMESTAMP_FILE = ".codecanary/init_timestamp"
 
 
 class BaitGenerator:
@@ -77,12 +83,54 @@ class BaitGenerator:
         self._write_prompts()
         self._write_readme()
         self._write_guardrails_template()
+        self._write_timestamp()
 
         # Initialize git if requested
         if self.init_git:
             self._init_git()
 
         return self.output_dir
+
+    def _write_timestamp(self) -> None:
+        """Write timestamp file for tracking when bait repo was created.
+        
+        This allows the scanner to identify AI-generated files by
+        only scanning files created AFTER this timestamp.
+        """
+        timestamp_path = self.output_dir / TIMESTAMP_FILE
+        timestamp_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Store both Unix timestamp and human-readable format
+        now = datetime.now(timezone.utc)
+        content = {
+            "created_at": now.isoformat(),
+            "unix_timestamp": time.time(),
+            "description": "Files modified after this timestamp are AI-generated responses",
+        }
+        
+        with open(timestamp_path, "w", encoding="utf-8") as f:
+            yaml.dump(content, f, default_flow_style=False)
+    
+    @staticmethod
+    def get_init_timestamp(bait_dir: str) -> Optional[float]:
+        """Get the initialization timestamp from a bait repo.
+        
+        Args:
+            bait_dir: Path to the bait repository
+            
+        Returns:
+            Unix timestamp or None if not found
+        """
+        timestamp_path = Path(bait_dir) / TIMESTAMP_FILE
+        if not timestamp_path.exists():
+            return None
+        
+        try:
+            with open(timestamp_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                return data.get("unix_timestamp")
+        except Exception:
+            return None
 
     def _write_bait_files(self) -> None:
         """Write bait files from test cases."""

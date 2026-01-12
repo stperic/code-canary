@@ -201,9 +201,16 @@ def test(
 @click.option(
     "--input",
     "-i",
-    default="./responses",
+    default=None,
     envvar="CODECANARY_SCAN_INPUT",
-    help="Directory containing AI responses",
+    help="Directory containing AI responses (or use --bait-dir)",
+)
+@click.option(
+    "--bait-dir",
+    "-b",
+    default=None,
+    envvar="CODECANARY_BAIT_DIR",
+    help="Bait directory to scan (auto-filters to only AI-generated files)",
 )
 @click.option(
     "--output",
@@ -220,25 +227,59 @@ def test(
     envvar="CODECANARY_SCANNER",
     help="Scanner backend to use",
 )
-def scan(input: str, output: str, scanner: str) -> None:
+def scan(input: str | None, bait_dir: str | None, output: str, scanner: str) -> None:
     """Scan AI responses for canary patterns.
 
     Analyzes the AI-generated code for security anti-patterns and
     canary tokens that indicate context poisoning.
 
     \b
+    Two modes of operation:
+
+    1. Scan a responses directory:
+        codecanary scan --input ./responses
+
+    2. Scan a bait repo (auto-detects AI-generated files):
+        codecanary scan --bait-dir ./test-repo
+
+    \b
     Example:
         codecanary scan --input ./responses
-        codecanary scan -i ./my-responses -o ./my-results/findings.json
+        codecanary scan --bait-dir ./test-repo
+        codecanary scan -b ./test-repo -o ./my-results/findings.json
     """
     from codecanary.scanner.analyzer import Analyzer
+    from codecanary.bait.generator import BaitGenerator
 
-    input_path = Path(input)
+    # Determine input path and timestamp filter
+    after_timestamp = None
+    
+    if bait_dir:
+        input_path = Path(bait_dir)
+        # Read timestamp from bait repo to filter out original files
+        after_timestamp = BaitGenerator.get_init_timestamp(bait_dir)
+        if after_timestamp:
+            console.print(f"[dim]Filtering to files created after bait init[/dim]")
+        else:
+            console.print("[yellow]⚠[/yellow] No init timestamp found in bait repo")
+            console.print("[dim]  Scanning all files (may include bait files)[/dim]")
+    elif input:
+        input_path = Path(input)
+    else:
+        # Default to bait_repo if it exists, otherwise responses
+        if Path("./bait_repo").exists():
+            input_path = Path("./bait_repo")
+            after_timestamp = BaitGenerator.get_init_timestamp("./bait_repo")
+            if after_timestamp:
+                console.print(f"[dim]Using bait_repo, filtering to AI-generated files[/dim]")
+        else:
+            input_path = Path("./responses")
+
     output_path = Path(output)
 
     if not input_path.exists():
-        console.print(f"[red]Error:[/red] Input directory not found: {input}")
-        console.print("[dim]Save AI responses to this directory first[/dim]")
+        console.print(f"[red]Error:[/red] Directory not found: {input_path}")
+        console.print("[dim]Run 'codecanary init' first, or specify --input[/dim]")
         raise SystemExit(1)
 
     console.print(f"[dim]Scanning: {input_path}[/dim]")
@@ -246,7 +287,7 @@ def scan(input: str, output: str, scanner: str) -> None:
 
     try:
         analyzer = Analyzer(scanner_type=scanner)
-        result = analyzer.scan_directory(input_path)
+        result = analyzer.scan_directory(input_path, after_timestamp=after_timestamp)
 
         # Save findings
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -255,7 +296,7 @@ def scan(input: str, output: str, scanner: str) -> None:
         console.print()
         console.print(f"[green]✓[/green] Scanned {result.files_scanned} files")
         if result.files_skipped > 0:
-            console.print(f"[dim]  Skipped {result.files_skipped} files[/dim]")
+            console.print(f"[dim]  Skipped {result.files_skipped} files (bait or binary)[/dim]")
         console.print(f"[green]✓[/green] Found {len(result.findings)} finding(s)")
         console.print(f"[dim]  Results: {output_path}[/dim]")
 
