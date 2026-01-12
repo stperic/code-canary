@@ -101,6 +101,10 @@ class TestCase(BaseModel):
         default=None,
         description="OWASP Top 10 mapping (e.g., 'A07:2021')",
     )
+    language: str = Field(
+        default="python",
+        description="Programming language (python, javascript, go)",
+    )
 
     # Bait Configuration
     bait_files: list[BaitFile] = Field(

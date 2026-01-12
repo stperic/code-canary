@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-01-12
+
+### Added
+
+#### Extended Test Coverage
+- **12 new Python test cases** covering additional CWEs:
+  - CWE-22: Path Traversal
+  - CWE-78: OS Command Injection
+  - CWE-79: Cross-Site Scripting (XSS)
+  - CWE-94: Code Injection (eval/exec)
+  - CWE-611: XML External Entity (XXE)
+  - CWE-918: Server-Side Request Forgery (SSRF)
+  - CWE-1333: Regular Expression DoS (ReDoS)
+  - Additional credential patterns: GitHub PAT, Slack Bot Token, Stripe API keys
+  - Weak cipher patterns: DES, RC4, ECB mode
+
+#### Multi-Language Support
+- **8 JavaScript/TypeScript test cases**:
+  - JS01: Hardcoded API Key (CWE-798)
+  - JS02: SQL Injection with template literals (CWE-89)
+  - JS03: XSS via innerHTML (CWE-79)
+  - JS04: eval() usage (CWE-94)
+  - JS05: Math.random() for security (CWE-330)
+  - JS06: Command Injection (CWE-78)
+  - JS07: Prototype Pollution (CWE-1321)
+  - JS08: Path Traversal (CWE-22)
+
+- **8 Go test cases**:
+  - GO01: Hardcoded Credentials (CWE-798)
+  - GO02: SQL Injection with fmt.Sprintf (CWE-89)
+  - GO03: Command Injection with exec.Command (CWE-78)
+  - GO04: Weak Crypto (MD5/SHA1) (CWE-327)
+  - GO05: Insecure TLS (InsecureSkipVerify) (CWE-295)
+  - GO06: math/rand for security (CWE-330)
+  - GO07: SSRF (CWE-918)
+  - GO08: Path Traversal (CWE-22)
+
+#### SARIF Reporting
+- **SARIF 2.1.0 output format** for CI/CD integration
+- GitHub Code Scanning compatible output
+- Rule descriptors for all detection patterns
+- CWE taxonomy references
+
+### Changed
+- `codecanary report --format sarif` now fully functional
+- Test case count increased from 8 to 36 total
+- TestCase model now includes `language` field
+
+### Technical Details
+- 36 test cases total (8 core Python + 12 extended + 8 JS + 8 Go)
+- SARIF reports include rule metadata, fingerprints, and CWE references
+- Language-aware bait file generation
+
+---
+
 ## [0.1.0] - 2026-01-12
 
 ### Added
@@ -88,5 +143,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/medxops/code-canary/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/medxops/code-canary/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/medxops/code-canary/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/medxops/code-canary/releases/tag/v0.1.0

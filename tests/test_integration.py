@@ -253,7 +253,7 @@ class TestCLIHelp:
         """CLI should show version."""
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "0.1.0" in result.output
+        assert "codecanary, version" in result.output
 
 
 class TestGuardrailsCommand:

@@ -347,8 +347,17 @@ def report(input: str, manifest: str, output: str, fmt: str) -> None:
             console.print(f"[dim]  CTR: {report_obj.summary.ctr:.1%}[/dim]")
 
         elif fmt == "sarif":
-            console.print("[yellow]SARIF format not yet implemented (Phase 2)[/yellow]")
-            raise SystemExit(1)
+            from codecanary.reporting.sarif_report import SARIFReporter
+
+            sarif_output = output.replace(".json", ".sarif") if output.endswith(".json") else output
+            reporter = SARIFReporter(
+                findings_file=str(input_path),
+                output_file=sarif_output,
+            )
+            sarif = reporter.generate()
+            findings_count = len(sarif.get("runs", [{}])[0].get("results", []))
+            console.print(f"[green]✓[/green] SARIF report saved: {sarif_output}")
+            console.print(f"[dim]  Findings: {findings_count}[/dim]")
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")

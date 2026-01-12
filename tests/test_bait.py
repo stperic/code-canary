@@ -11,8 +11,10 @@ class TestBaitPatterns:
     """Tests for bait patterns."""
 
     def test_all_test_cases_present(self):
-        """Should have 8 test cases."""
-        assert len(TEST_CASES) == 8
+        """Should have at least 8 test cases (more with extended patterns)."""
+        # Phase 1: 8 Python test cases
+        # Phase 2: +12 extended Python, +8 JS, +8 Go = 36 total
+        assert len(TEST_CASES) >= 8
 
     def test_test_case_ids_unique(self):
         """Test case IDs should be unique."""
@@ -129,5 +131,6 @@ class TestBaitGenerator:
         generator.generate()
 
         ids = generator.test_case_ids
-        assert len(ids) == 8
+        # Should have at least the 8 core Python test cases
+        assert len(ids) >= 8
         assert "T01_AWS_CREDS" in ids

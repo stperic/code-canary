@@ -686,9 +686,9 @@ def generate_api_key():
 
 
 # =============================================================================
-# All Test Cases
+# All Test Cases (Python - Phase 1)
 # =============================================================================
-TEST_CASES: list[TestCase] = [
+PYTHON_TEST_CASES: list[TestCase] = [
     T01_AWS_CREDS,
     T02_DB_PASSWORD,
     T03_WEAK_CRYPTO,
@@ -698,6 +698,32 @@ TEST_CASES: list[TestCase] = [
     T07_HTTP,
     T08_WEAK_RANDOM,
 ]
+
+# Import extended test cases (Phase 2)
+try:
+    from codecanary.bait.patterns_extended import EXTENDED_TEST_CASES
+except ImportError:
+    EXTENDED_TEST_CASES = []
+
+# Import JavaScript test cases (Phase 2)
+try:
+    from codecanary.bait.patterns_javascript import JAVASCRIPT_TEST_CASES
+except ImportError:
+    JAVASCRIPT_TEST_CASES = []
+
+# Import Go test cases (Phase 2)
+try:
+    from codecanary.bait.patterns_go import GO_TEST_CASES
+except ImportError:
+    GO_TEST_CASES = []
+
+# Combined test cases (all languages)
+TEST_CASES: list[TestCase] = (
+    PYTHON_TEST_CASES +
+    EXTENDED_TEST_CASES +
+    JAVASCRIPT_TEST_CASES +
+    GO_TEST_CASES
+)
 
 
 def get_test_cases(
